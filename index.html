@@ -1,1 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>ToneAudio — Untitled Studio</title>
+  <script src="config.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
+    :root {
+      --bg-base: #0a0c0f;
+      --bg-elevated: #111316;
+      --bg-glass: rgba(18, 20, 24, 0.75);
+      --border-subtle: rgba(255, 255, 255, 0.06);
+      --border-active: rgba(255, 255, 255, 0.15);
+      --text-primary: #f1f3f5;
+      --text-secondary: #9aa2b1;
+      --text-dim: #5f6675;
+      --accent: #e0e2e6;
+      --accent-glow: rgba(255, 255, 255, 0.08);
+      --status-idea: #6c757d;
+      --status-wip: #f4c542;
+      --status-demo: #4da8e0;
+      --status-done: #6fcf97;
+      --status-released: #f2f2f2;
+      --radius-card: 20px;
+      --radius-element: 14px;
+      --transition-fast: 0.2s cubic-bezier(0.2, 0.9, 0.4, 1.1);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-base);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* animated grain / subtle noise */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle at 30% 40%, rgba(35, 40, 48, 0.4) 0%, rgba(8, 10, 12, 0.9) 100%);
+      pointer-events: none;
+      z-index: -2;
+    }
+
+    /* blurred glassmorphic background shapes */
+    .bg-aura {
+      position: fixed;
+      width: 80vw;
+      height: 80vw;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(80, 100, 120, 0.2), transparent 70%);
+      filter: blur(100px);
+      z-index: -1;
+      pointer-events: none;
+    }
+
+    .aura-1 { top: -20vh; left: -10vw; }
+    .aura-2 { bottom: -30vh; right: -15vw; background: radial-gradient(circle, rgba(140, 120, 170, 0.2), transparent); }
+
+    /* layout */
+    #app {
+      display: flex;
+      min-height: 100vh;
+      position: relative;
+      backdrop-filter: blur(2px);
+    }
+
+    /* sidebar — minimal & floating */
+    .sidebar {
+      width: 260px;
+      flex-shrink: 0;
+      background: rgba(12, 14, 18, 0.85);
+      backdrop-filter: blur(18px);
+      border-right: 1px solid var(--border-subtle);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      padding: 28px 0 32px 0;
+      z-index: 20;
+      transition: transform 0.3s var(--transition-fast);
+    }
+
+    .logo-area {
+      padding: 0 24px 28px 24px;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 28px;
+    }
+
+    .logo-area h1 {
+      font-size: 1.9rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #fff, #b0b8c5);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .logo-area span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-top: 4px;
+      display: block;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 24px;
+      margin: 4px 8px;
+      border-radius: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .nav-item svg {
+      opacity: 0.7;
+      width: 18px;
+      height: 18px;
+    }
+
+    .nav-item:hover {
+      background: var(--accent-glow);
+      color: var(--text-primary);
+    }
+
+    .nav-item.active {
+      background: rgba(255, 255, 255, 0.08);
+      color: white;
+    }
+
+    .nav-item.active svg {
+      opacity: 1;
+    }
+
+    .sidebar-projects {
+      margin-top: 24px;
+      padding: 0 12px;
+    }
+
+    .section-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      padding: 0 12px 12px 12px;
+    }
+
+    .project-chip {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      margin: 2px 0;
+      border-radius: 12px;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.1s;
+    }
+
+    .project-chip:hover {
+      background: rgba(255,255,255,0.05);
+      color: white;
+    }
+
+    .project-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--text-dim);
+    }
+
+    /* main content */
+    .main {
+      flex: 1;
+      padding: 36px 48px;
+      overflow-y: auto;
+      min-height: 100vh;
+    }
+
+    .page {
+      display: none;
+      animation: fadeSlide 0.3s ease;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px);}
+      to { opacity: 1; transform: translateY(0);}
+    }
+
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .page-header h2 {
+      font-size: 2.2rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .page-header p {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      margin-top: 6px;
+    }
+
+    /* buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 20px;
+      border-radius: 40px;
+      font-weight: 500;
+      font-size: 0.85rem;
+      background: transparent;
+      border: 1px solid var(--border-active);
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: all 0.2s;
+      font-family: inherit;
+    }
+
+    .btn-primary {
+      background: white;
+      border-color: white;
+      color: black;
+    }
+
+    .btn-primary:hover {
+      background: #e0e2e6;
+      transform: scale(0.97);
+    }
+
+    .btn-ghost {
+      border-color: rgba(255,255,255,0.2);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.4);
+    }
+
+    .btn-danger {
+      border-color: rgba(255, 80, 80, 0.3);
+      color: #ff8a8a;
+    }
+
+    .btn-sm {
+      padding: 5px 14px;
+      font-size: 0.75rem;
+    }
+
+    /* cards */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-card);
+      padding: 20px;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .card:hover {
+      border-color: var(--border-active);
+      transform: translateY(-3px);
+      background: #14181f;
+    }
+
+    /* song rows - untitled style minimal list */
+    .song-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .song-row {
+      display: grid;
+      grid-template-columns: 32px 1fr 140px 90px 80px 100px;
+      gap: 12px;
+      align-items: center;
+      padding: 12px 18px;
+      background: rgba(18, 20, 24, 0.6);
+      border-radius: 16px;
+      border: 1px solid var(--border-subtle);
+      transition: all 0.15s;
+      cursor: pointer;
+    }
+
+    .song-row:hover {
+      background: #1a1e24;
+      border-color: rgba(255,255,255,0.12);
+      transform: translateX(4px);
+    }
+
+    .status-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      padding: 4px 10px;
+      border-radius: 40px;
+      text-align: center;
+      background: rgba(255,255,255,0.05);
+      width: fit-content;
+    }
+
+    .status-idea { background: #2d2f36; color: var(--status-idea); }
+    .status-wip { background: #423d1c; color: var(--status-wip); }
+    .status-demo { background: #1c3445; color: var(--status-demo); }
+    .status-done { background: #1d3a2a; color: var(--status-done); }
+    .status-released { background: #3c3f4a; color: white; }
+
+    /* stats */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4,1fr);
+      gap: 18px;
+      margin-bottom: 48px;
+    }
+
+    .stat-card {
+      background: var(--bg-glass);
+      backdrop-filter: blur(8px);
+      border-radius: 24px;
+      padding: 18px 22px;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .stat-card-value {
+      font-size: 2.4rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    /* modals */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(12px);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: #121417;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 28px;
+      width: 100%;
+      max-width: 680px;
+      max-height: 85vh;
+      overflow-y: auto;
+      box-shadow: 0 30px 50px rgba(0,0,0,0.5);
+    }
+
+    .modal-header {
+      padding: 24px 28px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-close {
+      background: rgba(255,255,255,0.05);
+      border: none;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      color: var(--text-secondary);
+      cursor: pointer;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+
+    input, select, textarea {
+      background: #1b1f26;
+      border: 1px solid var(--border-subtle);
+      border-radius: 16px;
+      padding: 12px 16px;
+      color: white;
+      font-family: inherit;
+      font-size: 0.85rem;
+    }
+
+    .upload-zone {
+      border: 1px dashed rgba(255,255,255,0.2);
+      border-radius: 20px;
+      padding: 28px;
+      text-align: center;
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+
+    .file-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #0f1115;
+      border-radius: 14px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+    }
+
+    /* pin screen refined */
+    #pin-screen {
+      position: fixed;
+      inset: 0;
+      background: #050608;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(20px);
+    }
+
+    #pin-screen.hidden { display: none; }
+
+    .pin-dots {
+      display: flex;
+      gap: 18px;
+      margin: 32px 0;
+    }
+
+    .pin-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.2);
+      transition: all 0.1s;
+    }
+
+    .pin-dot.filled { background: white; transform: scale(1.1); }
+
+    .pin-keypad {
+      display: grid;
+      grid-template-columns: repeat(3, 80px);
+      gap: 12px;
+    }
+
+    .pin-key {
+      background: rgba(255,255,255,0.06);
+      border-radius: 60px;
+      padding: 18px 0;
+      text-align: center;
+      font-size: 1.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: 0.07s linear;
+    }
+
+    /* player */
+    .player-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 280px;
+      right: 20px;
+      background: rgba(12, 14, 18, 0.9);
+      backdrop-filter: blur(24px);
+      border-radius: 56px;
+      padding: 12px 24px;
+      display: none;
+      align-items: center;
+      gap: 18px;
+      z-index: 90;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .player-bar.visible { display: flex; }
+
+    @media (max-width: 780px) {
+      .sidebar { position: fixed; left: -280px; top: 0; height: 100vh; }
+      .sidebar.mobile-open { left: 0; }
+      .main { padding: 24px 20px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .song-row { grid-template-columns: 28px 1fr; gap: 10px; }
+      .song-row .song-project, .song-row .song-key, .song-row .song-bpm { display: none; }
+      .player-bar { left: 16px; right: 16px; bottom: 16px; }
+      .hamburger { display: flex; position: fixed; top: 18px; left: 18px; z-index: 100; background: #111; border-radius: 40px; padding: 8px 12px; gap: 6px; border: 1px solid var(--border-subtle); }
+      .hamburger span { width: 20px; height: 2px; background: white; display: block; }
+    }
+
+    .hamburger { display: none; cursor: pointer; }
+    .toast-container { position: fixed; bottom: 80px; right: 20px; z-index: 300; display: flex; flex-direction: column; gap: 8px; }
+    .toast { background: #1e2229; border-radius: 40px; padding: 10px 18px; font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+<div id="pin-screen">
+  <div style="font-size: 2.8rem; font-weight: 600; letter-spacing: -0.02em;">TONE</div>
+  <div style="font-family: monospace; opacity: 0.5; margin-bottom: 32px;">audio diary</div>
+  <div class="pin-dots" id="pin-dots-container"></div>
+  <div class="pin-keypad" id="pin-keypad"></div>
+  <div id="pin-error" style="margin-top: 24px; font-size: 0.75rem; color: #ff8a8a;"></div>
+</div>
+
+<div class="bg-aura aura-1"></div><div class="bg-aura aura-2"></div>
+<button class="hamburger" id="hamburgerBtn"><span></span><span></span><span></span></button>
+
+<div id="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="logo-area"><h1>toneaudio</h1><span>untitled · studio</span></div>
+    <div class="nav-item active" data-page="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>Dashboard</div>
+    <div class="nav-item" data-page="projects"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>Projects</div>
+    <div class="nav-item" data-page="songs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Songs</div>
+    <div class="nav-item" data-page="files"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Files</div>
+    <div class="sidebar-projects" id="sidebarProjectsList"><div class="section-label">PROJECTS</div></div>
+  </aside>
+
+  <main class="main">
+    <div class="page active" id="page-dashboard"><div class="page-header"><div><h2>DASHBOARD</h2><p id="dash-date"></p></div></div><div class="stats-row" id="statsRow"></div><div class="recent-activity"><div class="section-label" style="margin-bottom: 16px;">RECENT TRACKS</div><div id="recentList"></div></div></div>
+    <div class="page" id="page-projects"><div class="page-header"><div><h2>PROJECTS</h2><p>creative containers</p></div><button class="btn btn-primary" onclick="openProjectModal()">+ New Project</button></div><div class="card-grid" id="projectsGrid"></div></div>
+    <div class="page" id="page-songs"><div class="page-header"><div><h2>SONGS</h2><p id="songsSub">all works</p></div><button class="btn btn-primary" onclick="openSongModal()">+ New Song</button></div><div class="filters-bar" style="display:flex; gap:12px; margin-bottom: 24px;"><input id="songSearch" placeholder="search..." class="search-input" style="background:#111;padding:8px 14px;border-radius:40px;"><select id="filterProjectSelect"></select><select id="filterStatusSelect"></select></div><div class="song-list" id="songsListContainer"></div></div>
+    <div class="page" id="page-files"><div class="page-header"><div><h2>FILES</h2><p>S3 vault</p></div></div><div class="upload-zone" id="globalUploadZone"><input type="file" multiple accept="audio/*" id="globalFileInput"><div>⬆️ drop or click to upload</div><div class="upload-progress" style="height:2px; background:#222; margin-top:10px;"><div class="upload-progress-bar" id="globalProgress" style="width:0%;height:100%;background:white;"></div></div></div><div class="filters-bar" style="margin:20px 0;"><select id="filesProjectFilter"></select><select id="filesSongFilter"></select></div><div id="globalFilesList"></div></div>
+  </main>
+</div>
+<div class="player-bar" id="playerBar"><div class="player-info"><span id="playerTitle"></span><span id="playerSub" style="font-size:0.7rem; opacity:0.6;"></span></div><audio id="audioPlayer" controls style="flex:1; height:32px;"></audio><button onclick="closePlayer()" style="background:none; border:none; color:white;">✕</button></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- modals reused same structure but minimal js -->
+<div class="modal-overlay" id="projectModal"><div class="modal"><div class="modal-header"><h3 id="projectModalTitle">New Project</h3><button class="modal-close" onclick="closeModal('projectModal')">✕</button></div><div class="modal-body" style="padding:20px;"><input id="projName" placeholder="Name"><input id="projGenre" placeholder="Genre"><input id="projColor" type="color" value="#ffffff"><textarea id="projNotes" placeholder="Notes..." rows="3"></textarea><div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;"><button class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button class="btn btn-primary" onclick="saveProject()">Save</button></div></div></div></div>
+<div class="modal-overlay" id="songModal"><div class="modal"><div class="modal-header"><h3 id="songModalTitle">New Song</h3><button class="modal-close" onclick="closeModal('songModal')">✕</button></div><div class="modal-body" style="padding:20px;"><input id="songTitle" placeholder="Title"><select id="songProjectSelect"></select><select id="songStatusSelect"><option>idea</option><option>wip</option><option>demo</option><option>done</option><option>released</option></select><input id="songBpm" placeholder="BPM"><input id="songKey" placeholder="Key"><textarea id="songLyrics" placeholder="Lyrics" rows="4"></textarea><textarea id="songNotes" placeholder="Notes" rows="2"></textarea><div class="form-actions"><button class="btn btn-ghost" onclick="closeModal('songModal')">Cancel</button><button class="btn btn-primary" onclick="saveSong()">Save</button></div></div></div></div>
+<div class="modal-overlay" id="songDetailModal"><div class="modal" style="max-width: 720px;"><div class="modal-header"><h3 id="detailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="detailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('songDetailModal')">✕</button></div></div><div class="modal-body" id="songDetailBody"></div></div></div>
+<div class="modal-overlay" id="projectDetailModal"><div class="modal"><div class="modal-header"><h3 id="projDetailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="projDetailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('projectDetailModal')">✕</button></div></div><div class="modal-body" id="projectDetailBody"></div></div></div>
+
+<script>
+// ------------- full original S3 logic + untitled redesign -------------
+const CONFIG = window.CONFIG || { aws: { accessKey: '', secretKey: '', region: '', bucket: '' } };
+let db = { projects: [], songs: [], files: [] };
+let editingProjectId = null, editingSongId = null, currentSongId = null, currentProjectId = null;
+let saveTimer = null;
+const DB_KEY = 'data/db.json';
+
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
+async function sha256(msg) { const encoder = new TextEncoder(); const data = encoder.encode(msg); const hash = await crypto.subtle.digest('SHA-256', data); return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function hmacSHA256(key, msg) { const encoder = new TextEncoder(); const cryptoKey = await crypto.subtle.importKey('raw', encoder.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); const sig = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(msg)); return Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+async function getSignatureKey(key, dateStamp, region, service) { let kDate = await hmacSHA256('AWS4'+key, dateStamp); let kRegion = await hmacSHA256(kDate, region); let kService = await hmacSHA256(kRegion, service); return await hmacSHA256(kService, 'aws4_request'); }
+async function s3Presigned(method, key, expires=900) {
+  const { accessKey, secretKey, region, bucket } = CONFIG.aws;
+  const now = new Date(); const amzDate = now.toISOString().replace(/[:\-]|\.\d{3}/g, ''); const dateStamp = amzDate.slice(0,8);
+  const host = `${bucket}.s3.${region}.amazonaws.com`; const encodedKey = encodeURIComponent(key).replace(/%2F/g, '/');
+  const q = `X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${accessKey}%2F${dateStamp}%2F${region}%2Fs3%2Faws4_request&X-Amz-Date=${amzDate}&X-Amz-Expires=${expires}&X-Amz-SignedHeaders=host`;
+  const canonicalRequest = `${method}\n/${encodedKey}\n${q}\nhost:${host}\n\nhost\nUNSIGNED-PAYLOAD`;
+  const hash = await sha256(canonicalRequest);
+  const scope = `${dateStamp}/${region}/s3/aws4_request`;
+  const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${scope}\n${hash}`;
+  const signingKey = await getSignatureKey(secretKey, dateStamp, region, 's3');
+  const signature = await hmacSHA256(signingKey, stringToSign);
+  return `https://${host}/${encodedKey}?${q}&X-Amz-Signature=${signature}`;
+}
+async function s3Put(key, file, prog) { const url = await s3Presigned('PUT', key, 900); return new Promise((res,rej)=>{ const xhr=new XMLHttpRequest(); xhr.open('PUT',url); xhr.upload.onprogress=e=>prog&&prog(e.loaded/e.total); xhr.onload=()=>xhr.status===200?res():rej(); xhr.send(file); }); }
+async function loadFromS3(){ try{ const url=await s3Presigned('GET',DB_KEY,3600); const resp=await fetch(url); if(resp.ok){ const data=await resp.json(); db=data; } }catch(e){} updateUI(); }
+function saveToS3(){ clearTimeout(saveTimer); saveTimer=setTimeout(async()=>{ const blob=new Blob([JSON.stringify({projects:db.projects,songs:db.songs,files:db.files})],{type:'application/json'}); await s3Put(DB_KEY,blob); toast('auto-saved'); },500); }
+function toast(msg,type='info'){ const t=document.createElement('div'); t.className='toast'; t.innerText=msg; document.getElementById('toastContainer').appendChild(t); setTimeout(()=>t.remove(),2500); }
+
+// render helpers
+function esc(s){ return String(s??'').replace(/[&<>]/g,function(m){if(m==='&')return'&amp;';if(m==='<')return'&lt;';if(m==='>')return'&gt;';return m;});}
+function fmtSize(b){ if(!b) return '0 B'; if(b<1024) return b+' B'; if(b<1e6) return (b/1024).toFixed(1)+' KB'; return (b/1e6).toFixed(1)+' MB';}
+
+function updateUI(){ renderDashboard(); renderProjects(); renderSongs(); renderFiles(); renderSidebarProjects(); updateSelects(); }
+function renderDashboard(){ document.getElementById('dash-date').innerText=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}); document.getElementById('statsRow').innerHTML=`<div class="stat-card"><div class="stat-card-value">${db.projects.length}</div><div>Projects</div></div><div class="stat-card"><div class="stat-card-value">${db.songs.length}</div><div>Songs</div></div><div class="stat-card"><div class="stat-card-value">${db.files.length}</div><div>Files</div></div><div class="stat-card"><div class="stat-card-value">${db.songs.filter(s=>s.status==='done'||s.status==='released').length}</div><div>Finished</div></div>`; const recent=[...db.songs].sort((a,b)=>b.created-a.created).slice(0,6); document.getElementById('recentList').innerHTML=recent.map(s=>`<div class="song-row" style="cursor:pointer; margin-bottom:8px;" onclick="openSongDetail('${s.id}')"><span>🎧</span><span><strong>${esc(s.title)}</strong></span><span class="status-badge status-${s.status}">${s.status}</span></div>`).join('')||'<div class="empty-state">No songs yet</div>'; }
+function renderSidebarProjects(){ const list=db.projects.map(p=>`<div class="project-chip" onclick="filterByProject('${p.id}')"><div class="project-dot" style="background:${p.colour||'#fff'}"></div>${esc(p.name)}</div>`).join(''); document.getElementById('sidebarProjectsList').innerHTML=`<div class="section-label">PROJECTS</div>${list||'<div style="padding:12px; font-size:0.8rem; opacity:0.5;">none</div>'}`; }
+function filterByProject(id){ navigate('songs'); document.getElementById('filterProjectSelect').value=id; renderSongs(); }
+function renderProjects(){ const grid=document.getElementById('projectsGrid'); grid.innerHTML=db.projects.map(p=>`<div class="card" onclick="openProjectDetail('${p.id}')"><div style="display:flex;gap:8px;align-items:center"><div style="width:10px;height:10px;border-radius:4px;background:${p.colour||'#fff'}"></div><strong style="font-size:1.2rem;">${esc(p.name)}</strong></div><div style="color:var(--text-secondary);font-size:0.75rem;">${esc(p.genre||'no genre')}</div><div style="margin-top:12px; display:flex; gap:12px;"><span>📀 ${db.songs.filter(s=>s.projectId===p.id).length}</span><span>🎵 ${db.files.filter(f=>f.projectId===p.id).length}</span></div></div>`).join('')||'<div class="empty-state">create first project</div>'; }
+function renderSongs(){ const filterProj=document.getElementById('filterProjectSelect')?.value; const filterStat=document.getElementById('filterStatusSelect')?.value; const search=document.getElementById('songSearch')?.value.toLowerCase(); let list=db.songs.filter(s=>(!filterProj||s.projectId===filterProj)&&(!filterStat||s.status===filterStat)&&(!search||s.title.toLowerCase().includes(search))); document.getElementById('songsListContainer').innerHTML=list.map((s,i)=>`<div class="song-row" onclick="openSongDetail('${s.id}')"><span>${String(i+1).padStart(2,'0')}</span><span><strong>${esc(s.title)}</strong></span><span class="song-project">${db.projects.find(p=>p.id===s.projectId)?.name||'—'}</span><span class="song-key">${esc(s.key||'-')}</span><span class="song-bpm">${s.bpm||'—'}bpm</span><span class="status-badge status-${s.status}">${s.status}</span></div>`).join('')||'<div class="empty-state">no songs</div>'; }
+function renderFiles(){ const projFilter=document.getElementById('filesProjectFilter')?.value,songFilter=document.getElementById('filesSongFilter')?.value; let filtered=db.files.filter(f=>(!projFilter||f.projectId===projFilter)&&(!songFilter||f.songId===songFilter)); document.getElementById('globalFilesList').innerHTML=filtered.map(f=>`<div class="file-row"><span>🎵</span><span>${esc(f.filename)}</span><span style="font-size:0.7rem;">${fmtSize(f.size)}</span><div style="margin-left:auto; display:flex; gap:6px;"><button class="btn btn-ghost btn-sm" onclick="playFile('${f.id}')">▶</button><button class="btn btn-ghost btn-sm" onclick="downloadFile('${f.id}')">↓</button><button class="btn btn-danger btn-sm" onclick="deleteFileRecord('${f.id}')">✕</button></div></div>`).join('')||'<div class="empty-state">no files</div>'; }
+function updateSelects(){
+  // save current selections before rewriting options
+  const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
+  const projFilterVal = getVal('filterProjectSelect');
+  const filesProjVal = getVal('filesProjectFilter');
+  const filesSongVal = getVal('filesSongFilter');
+  const songProjVal = getVal('songProjectSelect');
+
+  const projOpts = '<option value="">All Projects</option>'+db.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('filterProjectSelect').innerHTML = projOpts;
+  document.getElementById('filesProjectFilter').innerHTML = projOpts;
+
+  const songOpts = '<option value="">All Songs</option>'+db.songs.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  document.getElementById('filesSongFilter').innerHTML = songOpts;
+
+  document.getElementById('songProjectSelect').innerHTML = '<option value="">— none —</option>'+db.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+
+  // restore previous selections (if they still exist)
+  try { if (projFilterVal) document.getElementById('filterProjectSelect').value = projFilterVal; } catch(e){}
+  try { if (filesProjVal) document.getElementById('filesProjectFilter').value = filesProjVal; } catch(e){}
+  try { if (filesSongVal) document.getElementById('filesSongFilter').value = filesSongVal; } catch(e){}
+  try { if (songProjVal) document.getElementById('songProjectSelect').value = songProjVal; } catch(e){}
+}
+function navigate(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById(`page-${page}`).classList.add('active');
+  // highlight correct nav item
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
+  if (navItem) navItem.classList.add('active');
+  if(page==='dashboard')renderDashboard();
+  if(page==='projects')renderProjects();
+  if(page==='songs')renderSongs();
+  if(page==='files')renderFiles();
+}
+async function uploadFiles(files, songId, projectId, progressId){ for(let file of files){ const key=`audio/${projectId||'global'}/${songId||'misc'}/${Date.now()}_${file.name}`; await s3Put(key,file, pct=>{ if(progressId) document.getElementById(progressId).style.width=(pct*100)+'%'; }); db.files.push({id:uid(),songId,projectId,s3key:key,filename:file.name,size:file.size,uploaded:Date.now()}); saveToS3(); toast(`⬆️ ${file.name}`); } renderFiles(); if(songId && document.getElementById('songDetailModal').classList.contains('open')) openSongDetail(songId); if(progressId) setTimeout(()=>document.getElementById(progressId).style.width='0%',1000); }
+async function playFile(id){ const f=db.files.find(x=>x.id===id); if(!f)return; const url=await s3Presigned('GET',f.s3key,3600); const audio=document.getElementById('audioPlayer'); audio.src=url; audio.play(); document.getElementById('playerTitle').innerText=f.filename; document.getElementById('playerSub').innerText=db.songs.find(s=>s.id===f.songId)?.title||''; document.getElementById('playerBar').classList.add('visible'); }
+function closePlayer(){ const a=document.getElementById('audioPlayer'); a.pause(); a.src=''; document.getElementById('playerBar').classList.remove('visible'); }
+async function downloadFile(id){ const f=db.files.find(x=>x.id===id); if(!f)return; const url=await s3Presigned('GET',f.s3key,3600); window.open(url); }
+function deleteFileRecord(id){ db.files=db.files.filter(f=>f.id!==id); saveToS3(); renderFiles(); toast('removed from catalog'); }
+function openProjectModal(id){ editingProjectId=id; const p=id?db.projects.find(x=>x.id===id):null; document.getElementById('projName').value=p?.name||''; document.getElementById('projGenre').value=p?.genre||''; document.getElementById('projColor').value=p?.colour||'#ffffff'; document.getElementById('projNotes').value=p?.notes||''; openModal('projectModal'); }
+function saveProject(){ const name=document.getElementById('projName').value.trim(); if(!name)return; if(editingProjectId){ const p=db.projects.find(x=>x.id===editingProjectId); p.name=name; p.genre=document.getElementById('projGenre').value; p.colour=document.getElementById('projColor').value; p.notes=document.getElementById('projNotes').value; }else{ db.projects.push({id:uid(),name,genre:document.getElementById('projGenre').value,colour:document.getElementById('projColor').value,notes:document.getElementById('projNotes').value,created:Date.now()}); } saveToS3(); closeModal('projectModal'); updateUI(); }
+function openSongModal(id){ editingSongId=id; const s=id?db.songs.find(x=>x.id===id):null; document.getElementById('songTitle').value=s?.title||''; document.getElementById('songProjectSelect').value=s?.projectId||''; document.getElementById('songStatusSelect').value=s?.status||'idea'; document.getElementById('songBpm').value=s?.bpm||''; document.getElementById('songKey').value=s?.key||''; document.getElementById('songLyrics').value=s?.lyrics||''; document.getElementById('songNotes').value=s?.notes||''; openModal('songModal'); }
+function saveSong(){ const title=document.getElementById('songTitle').value.trim(); if(!title)return; const data={title,projectId:document.getElementById('songProjectSelect').value||null,status:document.getElementById('songStatusSelect').value,bpm:parseInt(document.getElementById('songBpm').value)||null,key:document.getElementById('songKey').value,lyrics:document.getElementById('songLyrics').value,notes:document.getElementById('songNotes').value,created:Date.now()}; if(editingSongId){ Object.assign(db.songs.find(s=>s.id===editingSongId),data); }else{ db.songs.push({id:uid(),...data}); } saveToS3(); closeModal('songModal'); updateUI(); }
+function openSongDetail(id){ currentSongId=id; const s=db.songs.find(x=>x.id===id); if(!s)return; const files=db.files.filter(f=>f.songId===id); const proj=db.projects.find(p=>p.id===s.projectId); document.getElementById('detailTitle').innerText=s.title; document.getElementById('songDetailBody').innerHTML=`<div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;"><div><label>Project</label><div>${proj?.name||'—'}</div></div><div><label>Status</label><div class="status-badge status-${s.status}">${s.status}</div></div><div><label>BPM</label><div>${s.bpm||'—'}</div></div><div><label>Key</label><div>${esc(s.key||'—')}</div></div></div>${s.lyrics?`<div style="margin-top:16px;"><label>Lyrics</label><div style="background:#0b0d10; padding:14px; border-radius:16px;">${esc(s.lyrics)}</div></div>`:''}<div style="margin-top:20px;"><div class="section-label">Audio files</div>${files.map(f=>`<div class="file-row"><span>${esc(f.filename)}</span><div><button class="btn btn-ghost btn-sm" onclick="playFile('${f.id}')">▶</button><button class="btn btn-ghost btn-sm" onclick="downloadFile('${f.id}')">↓</button></div></div>`).join('')||'<div>none</div>'}</div><div class="upload-zone" style="margin-top:16px;"><input type="file" multiple accept="audio/*" id="songUploadInput" onchange="handleSongUpload(this, '${id}')"><div>➕ upload for this song</div><div class="upload-progress" style="height:2px;"><div id="songDetailProgress" style="width:0%;height:100%;background:white;"></div></div></div><div style="margin-top:20px;"><button class="btn btn-danger btn-sm" onclick="deleteSong('${id}')">Delete Song</button></div>`; document.getElementById('detailEditBtn').onclick=()=>{ closeModal('songDetailModal'); openSongModal(id); }; openModal('songDetailModal'); }
+function handleSongUpload(input, songId){ const files=Array.from(input.files); const song=db.songs.find(s=>s.id===songId); uploadFiles(files, songId, song?.projectId||null, 'songDetailProgress'); }
+function deleteSong(id){ if(confirm('delete song and references?')){ db.songs=db.songs.filter(s=>s.id!==id); db.files=db.files.filter(f=>f.songId!==id); saveToS3(); closeModal('songDetailModal'); updateUI(); toast('song removed'); } }
+function openProjectDetail(id){ currentProjectId=id; const p=db.projects.find(x=>x.id===id); const songs=db.songs.filter(s=>s.projectId===id); document.getElementById('projDetailTitle').innerText=p.name; document.getElementById('projectDetailBody').innerHTML=`<p>${esc(p.notes||'')}</p><div class="section-label">Songs</div>${songs.map(s=>`<div class="song-row" onclick="openSongDetail('${s.id}')"><span>🎵</span>${esc(s.title)}<span class="status-badge status-${s.status}">${s.status}</span></div>`).join('')||'<div>no songs</div>'}<button class="btn btn-danger btn-sm" style="margin-top:20px;" onclick="deleteProject('${id}')">Delete Project</button>`; document.getElementById('projDetailEditBtn').onclick=()=>{ closeModal('projectDetailModal'); openProjectModal(id); }; openModal('projectDetailModal'); }
+function deleteProject(id){ if(confirm('delete project? songs unassigned')){ db.projects=db.projects.filter(p=>p.id!==id); db.songs.forEach(s=>{if(s.projectId===id)s.projectId=null;}); saveToS3(); closeModal('projectDetailModal'); updateUI(); } }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+// Pin logic
+let pinEntry='', pinCode='137900'; const pinDotsContainer=document.getElementById('pin-dots-container'); for(let i=0;i<6;i++){const d=document.createElement('div');d.className='pin-dot';d.id=`pindot${i}`;pinDotsContainer.appendChild(d);}
+function updatePinDots(){for(let i=0;i<6;i++){document.getElementById(`pindot${i}`).classList.toggle('filled',i<pinEntry.length);}}
+function pinPress(d){if(pinEntry.length<6){pinEntry+=d;updatePinDots();if(pinEntry.length===6){if(pinEntry===pinCode){document.getElementById('pin-screen').classList.add('hidden');loadFromS3();}else{document.getElementById('pin-error').innerText='wrong code';setTimeout(()=>{pinEntry='';updatePinDots();document.getElementById('pin-error').innerText='';},700);}}}}
+function pinDelete(){pinEntry=pinEntry.slice(0,-1);updatePinDots();}
+const keypad=document.getElementById('pin-keypad');[...'1234567890'].forEach(k=>{const btn=document.createElement('div');btn.className='pin-key';btn.innerText=k;btn.onclick=()=>pinPress(k);keypad.appendChild(btn);});const del=document.createElement('div');del.className='pin-key';del.innerText='⌫';del.onclick=pinDelete;keypad.appendChild(del);
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+document.getElementById('globalFileInput').onchange=e=>uploadFiles(Array.from(e.target.files),null,null,'globalProgress');
+document.getElementById('globalUploadZone').addEventListener('dragover',e=>e.preventDefault()); document.getElementById('globalUploadZone').addEventListener('drop',e=>{e.preventDefault(); const files=Array.from(e.dataTransfer.files); uploadFiles(files,null,null,'globalProgress');});
+document.getElementById('songSearch').addEventListener('input',()=>renderSongs()); document.getElementById('filterProjectSelect').addEventListener('change',()=>renderSongs()); document.getElementById('filterStatusSelect').innerHTML='<option value="">All</option><option>idea</option><option>wip</option><option>demo</option><option>done</option><option>released</option>'; document.getElementById('filterStatusSelect').addEventListener('change',()=>renderSongs()); document.getElementById('filesProjectFilter').addEventListener('change',()=>renderFiles()); document.getElementById('filesSongFilter').addEventListener('change',()=>renderFiles()); document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>navigate(n.getAttribute('data-page')))); document.getElementById('hamburgerBtn').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('mobile-open'));
+window.openProjectModal=openProjectModal; window.openSongModal=openSongModal; window.saveProject=saveProject; window.saveSong=saveSong; window.openSongDetail=openSongDetail; window.playFile=playFile; window.downloadFile=downloadFile; window.deleteFileRecord=deleteFileRecord; window.openProjectDetail=openProjectDetail; window.deleteSong=deleteSong; window.filterByProject=filterByProject; window.navigate=navigate; window.closeModal=closeModal; window.closePlayer=closePlayer; window.handleSongUpload=handleSongUpload; window.editCurrentSong=()=>{closeModal('songDetailModal'); openSongModal(currentSongId);};
+</script>
+</body>
+</html>
