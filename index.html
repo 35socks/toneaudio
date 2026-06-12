@@ -25,6 +25,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
+    /* ... (exactly the same CSS as before) ... */
     * {
       margin: 0;
       padding: 0;
@@ -731,7 +732,7 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- modals (unchanged) -->
+<!-- modals -->
 <div class="modal-overlay" id="projectModal"><div class="modal"><div class="modal-header"><h3 id="projectModalTitle">New Project</h3><button class="modal-close" onclick="closeModal('projectModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="projName" placeholder="Name"><input id="projGenre" placeholder="Genre"><input id="projColor" type="color" value="#ffffff"><textarea id="projNotes" placeholder="Notes..." rows="3"></textarea><div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;"><button class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button class="btn btn-primary" onclick="saveProject()">Save</button></div></div></div></div>
 <div class="modal-overlay" id="songModal"><div class="modal"><div class="modal-header"><h3 id="songModalTitle">New Song</h3><button class="modal-close" onclick="closeModal('songModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="songTitle" placeholder="Title"><select id="songProjectSelect"></select><select id="songStatusSelect"><option>idea</option><option>wip</option><option>demo</option><option>done</option><option>released</option></select><input id="songBpm" placeholder="BPM"><input id="songKey" placeholder="Key"><textarea id="songLyrics" placeholder="Lyrics" rows="4"></textarea><textarea id="songNotes" placeholder="Notes" rows="2"></textarea><div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px;"><button class="btn btn-ghost" onclick="closeModal('songModal')">Cancel</button><button class="btn btn-primary" onclick="saveSong()">Save</button></div></div></div></div>
 <div class="modal-overlay" id="songDetailModal"><div class="modal" style="max-width: 720px;"><div class="modal-header"><h3 id="detailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="detailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('songDetailModal')">✕</button></div></div><div class="modal-body" id="songDetailBody" style="padding:20px 32px 28px;"></div></div></div>
@@ -746,7 +747,9 @@ AWS.config.update({
   region: awsConfig.region
 });
 const s3 = new AWS.S3({ apiVersion: '2006-03-01', params: { Bucket: awsConfig.bucket } });
-const DB_KEY = 'data/db.json';
+
+// ✅ Changed: store database inside the audio/ prefix where we already have write permission
+const DB_KEY = 'audio/_db.json';
 
 // ----- App state -----
 let db = { projects: [], songs: [], files: [] };
@@ -776,7 +779,6 @@ async function loadFromS3() {
   updateUI();
 }
 
-// Immediate, non‑debounced save – used after critical changes
 async function saveNow() {
   const body = JSON.stringify({ projects: db.projects, songs: db.songs, files: db.files }, null, 2);
   try {
@@ -784,7 +786,7 @@ async function saveNow() {
       Key: DB_KEY,
       Body: body,
       ContentType: 'application/json',
-      ACL: 'private'           // adjust if needed
+      ACL: 'private'
     }).promise();
     console.log('DB saved successfully');
     return true;
@@ -795,7 +797,6 @@ async function saveNow() {
   }
 }
 
-// Debounced save for less critical updates
 let saveTimer = null;
 function saveToS3() {
   clearTimeout(saveTimer);
@@ -804,7 +805,6 @@ function saveToS3() {
 
 async function uploadFileToS3(file, songId, projectId, progressId) {
   const key = `audio/${projectId || 'global'}/${songId || 'misc'}/${Date.now()}_${file.name}`;
-  // Upload audio file
   const upload = s3.upload({
     Key: key,
     Body: file,
@@ -818,7 +818,6 @@ async function uploadFileToS3(file, songId, projectId, progressId) {
   }
   await upload.promise();
   
-  // Create file record
   const fileRecord = {
     id: uid(),
     songId,
@@ -830,13 +829,10 @@ async function uploadFileToS3(file, songId, projectId, progressId) {
   };
   db.files.push(fileRecord);
   
-  // Immediately persist the DB
   const saved = await saveNow();
   if (!saved) {
-    // Rollback the local file record if save failed
     db.files = db.files.filter(f => f.id !== fileRecord.id);
-    toast('File uploaded but database update failed – refresh will lose this entry', 'error');
-    // Still show the file in current UI? Optionally remove it.
+    toast('File uploaded but database update failed', 'error');
     renderFiles();
     if (progressId) document.getElementById(progressId).style.width = '0%';
     return;
@@ -968,7 +964,7 @@ async function uploadFiles(files, songId, projectId, progressId) {
   if (progressId) setTimeout(() => document.getElementById(progressId).style.width = '0%', 1000);
 }
 
-// ----- Custom player controls (unchanged) -----
+// ----- Custom player controls -----
 const audio = document.getElementById('audioPlayer');
 const playPauseBtn = document.getElementById('playPauseBtn');
 const progressBar = document.getElementById('progressBar');
@@ -1052,7 +1048,6 @@ async function deleteFileRecord(id) {
       toast('File deleted');
       if (currentAudio === id) closePlayer();
     } else {
-      // Rollback
       db.files.push(f);
       toast('Delete failed', 'error');
     }
@@ -1150,7 +1145,6 @@ function handleSongUpload(input, songId) {
 function deleteSong(id) {
   if (confirm('delete song and all its file references?')) {
     const filesToDelete = db.files.filter(f => f.songId === id);
-    // Delete S3 objects in parallel
     Promise.all(filesToDelete.map(f => deleteS3Object(f.s3key)));
     db.songs = db.songs.filter(s => s.id !== id);
     db.files = db.files.filter(f => f.songId !== id);
