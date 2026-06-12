@@ -25,7 +25,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
-    /* ... (exactly the same CSS as before) ... */
     * {
       margin: 0;
       padding: 0;
@@ -95,6 +94,7 @@
       position: relative;
     }
 
+    /* Sidebar - desktop */
     .sidebar {
       width: 260px;
       flex-shrink: 0;
@@ -212,6 +212,7 @@
       background: var(--text-dim);
     }
 
+    /* Main content */
     .main {
       flex: 1;
       padding: 40px 52px;
@@ -597,6 +598,7 @@
       white-space: nowrap;
     }
 
+    /* Pin screen */
     #pin-screen {
       position: fixed;
       inset: 0;
@@ -661,21 +663,218 @@
       transform: scale(0.96);
     }
 
-    @media (max-width: 780px) {
-      .sidebar { position: fixed; left: -280px; top: 0; height: 100vh; }
-      .sidebar.mobile-open { left: 0; }
-      .main { padding: 24px 20px; }
-      .stats-row { grid-template-columns: 1fr 1fr; }
-      .song-row { grid-template-columns: 28px 1fr; gap: 10px; }
-      .song-row .song-project, .song-row .song-key, .song-row .song-bpm { display: none; }
-      .player-bar { left: 16px; right: 16px; bottom: 16px; transform: none; width: auto; }
-      .hamburger { display: flex; position: fixed; top: 18px; left: 18px; z-index: 100; background: #0e1117; border-radius: 40px; padding: 10px 14px; gap: 7px; border: 1px solid var(--border-light); }
-      .hamburger span { width: 20px; height: 2px; background: white; display: block; }
+    /* Hamburger - hidden on desktop */
+    .hamburger {
+      display: none;
+      cursor: pointer;
     }
 
-    .hamburger { display: none; cursor: pointer; }
-    .toast-container { position: fixed; bottom: 100px; right: 24px; z-index: 300; display: flex; flex-direction: column; gap: 10px; }
-    .toast { background: #1e222b; border-radius: 40px; padding: 12px 22px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1); backdrop-filter: blur(8px); }
+    .toast-container {
+      position: fixed;
+      bottom: 100px;
+      right: 24px;
+      z-index: 300;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .toast {
+      background: #1e222b;
+      border-radius: 40px;
+      padding: 12px 22px;
+      font-size: 0.85rem;
+      border: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(8px);
+    }
+
+    /* ---------- MOBILE STYLES (max-width: 780px) ---------- */
+    @media (max-width: 780px) {
+      /* Sidebar as full-screen overlay */
+      .sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        width: 100%;
+        height: 100vh;
+        z-index: 50;
+        background: rgba(8, 11, 14, 0.95);
+        backdrop-filter: blur(30px);
+        border-right: none;
+        transition: left 0.35s ease;
+        padding-top: 80px;
+        overflow-y: auto;
+      }
+
+      .sidebar.mobile-open {
+        left: 0;
+      }
+
+      /* Hamburger visible */
+      .hamburger {
+        display: flex;
+        position: fixed;
+        top: 16px;
+        left: 16px;
+        z-index: 100;
+        background: #0e1117;
+        border-radius: 40px;
+        padding: 12px 16px;
+        gap: 7px;
+        border: 1px solid var(--border-light);
+        flex-direction: column;
+        align-items: center;
+        box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+      }
+
+      .hamburger span {
+        width: 20px;
+        height: 2px;
+        background: white;
+        display: block;
+        border-radius: 1px;
+      }
+
+      /* Main content padding */
+      .main {
+        padding: 24px 16px;
+        padding-top: 70px; /* room for hamburger */
+      }
+
+      .page-header h2 {
+        font-size: 2rem;
+      }
+
+      .page-header p {
+        font-size: 0.8rem;
+      }
+
+      /* Stats row: 2x2 grid */
+      .stats-row {
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .stat-card-value {
+        font-size: 2rem;
+      }
+
+      /* Cards: one column */
+      .card-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+
+      /* Song row: simplified columns */
+      .song-row {
+        grid-template-columns: 28px 1fr 80px;
+        gap: 8px;
+        padding: 12px 16px;
+      }
+
+      .song-row .song-project,
+      .song-row .song-key,
+      .song-row .song-bpm {
+        display: none;
+      }
+
+      /* File row: stack on small screens? Keep flex but allow wrapping */
+      .file-row {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .file-row > div:last-child {
+        width: 100%;
+        justify-content: flex-end;
+      }
+
+      /* Player bar: full width, stacked */
+      .player-bar {
+        left: 8px;
+        right: 8px;
+        bottom: 8px;
+        transform: none;
+        width: auto;
+        min-width: auto;
+        border-radius: 24px;
+        padding: 12px 16px;
+        flex-direction: column;
+        gap: 12px;
+        align-items: stretch;
+      }
+
+      .player-controls {
+        flex-direction: column;
+        gap: 8px;
+        align-items: stretch;
+      }
+
+      .player-info {
+        text-align: center;
+      }
+
+      .player-progress {
+        width: 100%;
+        min-width: auto;
+      }
+
+      .player-time {
+        text-align: center;
+      }
+
+      /* Modals full screen */
+      .modal-overlay {
+        padding: 0;
+      }
+
+      .modal {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        width: 100%;
+        height: 100vh;
+        overflow-y: auto;
+      }
+
+      .modal-header {
+        padding: 24px 24px 12px;
+      }
+
+      .modal-body {
+        padding: 20px 24px 28px !important;
+      }
+
+      /* Pin screen scaling */
+      .pin-logo {
+        font-size: 2.8rem;
+      }
+
+      .pin-dots {
+        gap: 16px;
+      }
+
+      .pin-dot {
+        width: 14px;
+        height: 14px;
+      }
+
+      .pin-keypad {
+        grid-template-columns: repeat(3, 70px);
+        gap: 10px;
+      }
+
+      .pin-key {
+        font-size: 1.6rem;
+        padding: 18px 0;
+      }
+
+      /* Toast container move up so player bar doesn't overlap */
+      .toast-container {
+        bottom: 130px;
+        right: 16px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -707,8 +906,8 @@
   <main class="main">
     <div class="page active" id="page-dashboard"><div class="page-header"><div><h2>Dashboard</h2><p id="dash-date"></p></div></div><div class="stats-row" id="statsRow"></div><div class="recent-activity"><div class="section-label" style="margin-bottom: 18px;">RECENT TRACKS</div><div id="recentList"></div></div></div>
     <div class="page" id="page-projects"><div class="page-header"><div><h2>Projects</h2><p>creative containers</p></div><button class="btn btn-primary" onclick="openProjectModal()">+ New Project</button></div><div class="card-grid" id="projectsGrid"></div></div>
-    <div class="page" id="page-songs"><div class="page-header"><div><h2>Songs</h2><p id="songsSub">all works</p></div><button class="btn btn-primary" onclick="openSongModal()">+ New Song</button></div><div class="filters-bar" style="display:flex; gap:12px; margin-bottom: 28px;"><input id="songSearch" placeholder="search tracks..." style="background:var(--bg-input); border-radius:40px; padding:12px 18px;"><select id="filterProjectSelect" style="max-width:180px;"></select><select id="filterStatusSelect" style="max-width:130px;"></select></div><div class="song-list" id="songsListContainer"></div></div>
-    <div class="page" id="page-files"><div class="page-header"><div><h2>Files</h2><p>S3 vault</p></div></div><div class="upload-zone" id="globalUploadZone"><input type="file" multiple accept="audio/*" id="globalFileInput"><div style="margin-top:12px;">⬆️ drop or click to upload</div><div class="upload-progress" style="height:3px; background:#1a1e26; margin-top:14px; border-radius:2px;"><div id="globalProgress" style="width:0%;height:100%;background:white;border-radius:2px;"></div></div></div><div class="filters-bar" style="margin:28px 0; display:flex; gap:14px;"><select id="filesProjectFilter"></select><select id="filesSongFilter"></select></div><div id="globalFilesList"></div></div>
+    <div class="page" id="page-songs"><div class="page-header"><div><h2>Songs</h2><p id="songsSub">all works</p></div><button class="btn btn-primary" onclick="openSongModal()">+ New Song</button></div><div class="filters-bar" style="display:flex; gap:12px; margin-bottom: 28px; flex-wrap: wrap;"><input id="songSearch" placeholder="search tracks..." style="background:var(--bg-input); border-radius:40px; padding:12px 18px; flex: 1; min-width: 150px;"><select id="filterProjectSelect" style="max-width:180px;"></select><select id="filterStatusSelect" style="max-width:130px;"></select></div><div class="song-list" id="songsListContainer"></div></div>
+    <div class="page" id="page-files"><div class="page-header"><div><h2>Files</h2><p>S3 vault</p></div></div><div class="upload-zone" id="globalUploadZone"><input type="file" multiple accept="audio/*" id="globalFileInput"><div style="margin-top:12px;">⬆️ drop or click to upload</div><div class="upload-progress" style="height:3px; background:#1a1e26; margin-top:14px; border-radius:2px;"><div id="globalProgress" style="width:0%;height:100%;background:white;border-radius:2px;"></div></div></div><div class="filters-bar" style="margin:28px 0; display:flex; gap:14px; flex-wrap: wrap;"><select id="filesProjectFilter"></select><select id="filesSongFilter"></select></div><div id="globalFilesList"></div></div>
   </main>
 </div>
 
@@ -720,21 +919,23 @@
       <div class="player-title" id="playerTitle"></div>
       <div class="player-sub" id="playerSub"></div>
     </div>
-    <button class="player-btn" id="playPauseBtn">▶</button>
-    <div class="player-progress" id="progressBar">
-      <div class="player-progress-fill" id="progressFill"></div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <button class="player-btn" id="playPauseBtn">▶</button>
+      <div class="player-progress" id="progressBar">
+        <div class="player-progress-fill" id="progressFill"></div>
+      </div>
     </div>
     <span class="player-time" id="timeDisplay">0:00 / 0:00</span>
   </div>
-  <button class="player-btn" id="closePlayerBtn">✕</button>
+  <button class="player-btn" id="closePlayerBtn" style="align-self: flex-end;">✕</button>
   <audio id="audioPlayer" style="display:none;"></audio>
 </div>
 
 <div class="toast-container" id="toastContainer"></div>
 
 <!-- modals -->
-<div class="modal-overlay" id="projectModal"><div class="modal"><div class="modal-header"><h3 id="projectModalTitle">New Project</h3><button class="modal-close" onclick="closeModal('projectModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="projName" placeholder="Name"><input id="projGenre" placeholder="Genre"><input id="projColor" type="color" value="#ffffff"><textarea id="projNotes" placeholder="Notes..." rows="3"></textarea><div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;"><button class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button class="btn btn-primary" onclick="saveProject()">Save</button></div></div></div></div>
-<div class="modal-overlay" id="songModal"><div class="modal"><div class="modal-header"><h3 id="songModalTitle">New Song</h3><button class="modal-close" onclick="closeModal('songModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="songTitle" placeholder="Title"><select id="songProjectSelect"></select><select id="songStatusSelect"><option>idea</option><option>wip</option><option>demo</option><option>done</option><option>released</option></select><input id="songBpm" placeholder="BPM"><input id="songKey" placeholder="Key"><textarea id="songLyrics" placeholder="Lyrics" rows="4"></textarea><textarea id="songNotes" placeholder="Notes" rows="2"></textarea><div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px;"><button class="btn btn-ghost" onclick="closeModal('songModal')">Cancel</button><button class="btn btn-primary" onclick="saveSong()">Save</button></div></div></div></div>
+<div class="modal-overlay" id="projectModal"><div class="modal"><div class="modal-header"><h3 id="projectModalTitle">New Project</h3><button class="modal-close" onclick="closeModal('projectModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="projName" placeholder="Name"><input id="projGenre" placeholder="Genre"><input id="projColor" type="color" value="#ffffff"><textarea id="projNotes" placeholder="Notes..." rows="3"></textarea><div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px; flex-wrap: wrap;"><button class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button class="btn btn-primary" onclick="saveProject()">Save</button></div></div></div></div>
+<div class="modal-overlay" id="songModal"><div class="modal"><div class="modal-header"><h3 id="songModalTitle">New Song</h3><button class="modal-close" onclick="closeModal('songModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="songTitle" placeholder="Title"><select id="songProjectSelect"></select><select id="songStatusSelect"><option>idea</option><option>wip</option><option>demo</option><option>done</option><option>released</option></select><input id="songBpm" placeholder="BPM"><input id="songKey" placeholder="Key"><textarea id="songLyrics" placeholder="Lyrics" rows="4"></textarea><textarea id="songNotes" placeholder="Notes" rows="2"></textarea><div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px; flex-wrap: wrap;"><button class="btn btn-ghost" onclick="closeModal('songModal')">Cancel</button><button class="btn btn-primary" onclick="saveSong()">Save</button></div></div></div></div>
 <div class="modal-overlay" id="songDetailModal"><div class="modal" style="max-width: 720px;"><div class="modal-header"><h3 id="detailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="detailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('songDetailModal')">✕</button></div></div><div class="modal-body" id="songDetailBody" style="padding:20px 32px 28px;"></div></div></div>
 <div class="modal-overlay" id="projectDetailModal"><div class="modal"><div class="modal-header"><h3 id="projDetailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="projDetailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('projectDetailModal')">✕</button></div></div><div class="modal-body" id="projectDetailBody" style="padding:20px 32px 28px;"></div></div></div>
 
@@ -748,7 +949,7 @@ AWS.config.update({
 });
 const s3 = new AWS.S3({ apiVersion: '2006-03-01', params: { Bucket: awsConfig.bucket } });
 
-// ✅ Changed: store database inside the audio/ prefix where we already have write permission
+// DB key inside audio prefix (write permission exists)
 const DB_KEY = 'audio/_db.json';
 
 // ----- App state -----
@@ -916,7 +1117,7 @@ function renderFiles() {
       <span>🎵</span>
       <span style="flex:1;">${esc(f.filename)}</span>
       <span style="font-size:0.75rem;opacity:0.6;">${fmtSize(f.size)}</span>
-      <div style="display:flex; gap:6px;">
+      <div style="display:flex; gap:6px; margin-left: auto;">
         <button class="btn btn-ghost btn-sm" onclick="playFile('${f.id}')">▶</button>
         <button class="btn btn-ghost btn-sm" onclick="downloadFile('${f.id}')">↓</button>
         <button class="btn btn-danger btn-sm" onclick="deleteFileRecord('${f.id}')">✕</button>
@@ -944,17 +1145,21 @@ function updateSelects() {
   try { if (filesSongVal) document.getElementById('filesSongFilter').value = filesSongVal; } catch (e) {}
   try { if (songProjVal) document.getElementById('songProjectSelect').value = songProjVal; } catch (e) {}
 }
+
 function navigate(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
   if (navItem) navItem.classList.add('active');
+  // Close sidebar on mobile after navigation
+  document.getElementById('sidebar').classList.remove('mobile-open');
   if (page === 'dashboard') renderDashboard();
   if (page === 'projects') renderProjects();
   if (page === 'songs') renderSongs();
   if (page === 'files') renderFiles();
 }
+
 async function uploadFiles(files, songId, projectId, progressId) {
   for (let file of files) {
     await uploadFileToS3(file, songId, projectId, progressId);
@@ -1183,7 +1388,7 @@ function deleteProject(id) {
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 
-// ----- Pin logic (unchanged) -----
+// ----- Pin logic -----
 let pinEntry = '';
 const pinCode = '137900';
 const pinDotsContainer = document.getElementById('pin-dots-container');
@@ -1242,6 +1447,23 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Enter') { e.preventDefault(); if (pinEntry.length === 6) submitPin(); }
 });
 
+// ----- Mobile sidebar toggle & close on nav item click -----
+document.getElementById('hamburgerBtn').addEventListener('click', () => {
+  document.querySelector('.sidebar').classList.toggle('mobile-open');
+});
+// Close sidebar when clicking outside on mobile (overlay)
+document.querySelector('.sidebar').addEventListener('click', (e) => {
+  if (e.target === document.querySelector('.sidebar') && window.innerWidth <= 780) {
+    document.querySelector('.sidebar').classList.remove('mobile-open');
+  }
+});
+// Also close when a nav item is clicked (already handled in navigate(), but we also need to close on project chip click)
+document.querySelectorAll('.project-chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    if (window.innerWidth <= 780) document.querySelector('.sidebar').classList.remove('mobile-open');
+  });
+});
+
 // ----- Global event listeners -----
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 document.getElementById('globalFileInput').onchange = e => uploadFiles(Array.from(e.target.files), null, null, 'globalProgress');
@@ -1258,7 +1480,6 @@ document.getElementById('filterStatusSelect').addEventListener('change', () => r
 document.getElementById('filesProjectFilter').addEventListener('change', () => renderFiles());
 document.getElementById('filesSongFilter').addEventListener('change', () => renderFiles());
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navigate(n.getAttribute('data-page'))));
-document.getElementById('hamburgerBtn').addEventListener('click', () => document.querySelector('.sidebar').classList.toggle('mobile-open'));
 
 // Expose globals
 window.openProjectModal = openProjectModal; window.openSongModal = openSongModal;
