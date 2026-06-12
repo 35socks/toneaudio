@@ -48,7 +48,6 @@
       -webkit-font-smoothing: antialiased;
     }
 
-    /* dynamic mesh background */
     body::before {
       content: '';
       position: fixed;
@@ -80,7 +79,6 @@
       position: relative;
     }
 
-    /* sidebar – refined */
     .sidebar {
       width: 260px;
       flex-shrink: 0;
@@ -198,10 +196,9 @@
       background: var(--text-dim);
     }
 
-    /* main content */
     .main {
       flex: 1;
-      padding: 40px 52px 40px 52px;
+      padding: 40px 52px;
       overflow-y: auto;
       min-height: 100vh;
     }
@@ -244,7 +241,6 @@
       margin-top: 6px;
     }
 
-    /* buttons */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -293,7 +289,6 @@
       font-size: 0.78rem;
     }
 
-    /* cards */
     .card-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
@@ -317,7 +312,6 @@
       box-shadow: 0 18px 40px -15px rgba(0,0,0,0.5);
     }
 
-    /* song rows – refined list */
     .song-list {
       display: flex;
       flex-direction: column;
@@ -376,7 +370,6 @@
     .status-done { background: #172e21; color: var(--status-done); }
     .status-released { background: #2a2e39; color: white; }
 
-    /* stats */
     .stats-row {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
@@ -405,7 +398,6 @@
       color: var(--text-muted);
     }
 
-    /* modals */
     .modal-overlay {
       display: none;
       position: fixed;
@@ -488,7 +480,6 @@
       background: #12161f;
     }
 
-    /* pin screen */
     #pin-screen {
       position: fixed;
       inset: 0;
@@ -553,7 +544,6 @@
       transform: scale(0.96);
     }
 
-    /* player bar – centered pill */
     .player-bar {
       position: fixed;
       bottom: 24px;
@@ -657,12 +647,12 @@
 <div class="modal-overlay" id="projectDetailModal"><div class="modal"><div class="modal-header"><h3 id="projDetailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="projDetailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('projectDetailModal')">✕</button></div></div><div class="modal-body" id="projectDetailBody" style="padding:20px 32px 28px;"></div></div></div>
 
 <script>
-// AWS config check
-const CONFIG = window.CONFIG || {};
-const hasValidAws = CONFIG.aws && CONFIG.aws.accessKey && CONFIG.aws.secretKey && CONFIG.aws.region && CONFIG.aws.bucket;
+// ----- AWS config (no redeclaration) -----
+const awsConfig = (window.CONFIG && window.CONFIG.aws) ? window.CONFIG.aws : null;
+const hasValidAws = awsConfig && awsConfig.accessKey && awsConfig.secretKey && awsConfig.region && awsConfig.bucket;
 
 if (!hasValidAws) {
-  document.addEventListener('DOMContentLoaded', () => {
+  window.addEventListener('load', () => {
     const t = document.createElement('div');
     t.className = 'toast';
     t.innerText = '⚠️ AWS config missing – cannot load/save files';
@@ -683,7 +673,7 @@ async function hmacSHA256(key, msg) { const encoder = new TextEncoder(); const c
 async function getSignatureKey(key, dateStamp, region, service) { let kDate = await hmacSHA256('AWS4'+key, dateStamp); let kRegion = await hmacSHA256(kDate, region); let kService = await hmacSHA256(kRegion, service); return await hmacSHA256(kService, 'aws4_request'); }
 async function s3Presigned(method, key, expires=900) {
   if (!hasValidAws) throw new Error('AWS not configured');
-  const { accessKey, secretKey, region, bucket } = CONFIG.aws;
+  const { accessKey, secretKey, region, bucket } = awsConfig;
   const now = new Date(); const amzDate = now.toISOString().replace(/[:\-]|\.\d{3}/g, ''); const dateStamp = amzDate.slice(0,8);
   const host = `${bucket}.s3.${region}.amazonaws.com`; const encodedKey = encodeURIComponent(key).replace(/%2F/g, '/');
   const q = `X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${accessKey}%2F${dateStamp}%2F${region}%2Fs3%2Faws4_request&X-Amz-Date=${amzDate}&X-Amz-Expires=${expires}&X-Amz-SignedHeaders=host`;
@@ -728,7 +718,6 @@ function toast(msg, type='info') {
   setTimeout(() => t.remove(), 2500);
 }
 
-// rest of logic identical to previous but with minor adjustments for new selectors
 function esc(s){ return String(s??'').replace(/[&<>]/g,function(m){if(m==='&')return'&amp;';if(m==='<')return'&lt;';if(m==='>')return'&gt;';return m;});}
 function fmtSize(b){ if(!b) return '0 B'; if(b<1024) return b+' B'; if(b<1e6) return (b/1024).toFixed(1)+' KB'; return (b/1e6).toFixed(1)+' MB';}
 
@@ -984,49 +973,105 @@ function deleteProject(id){
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 
-// Pin logic
-let pinEntry='', pinCode='137900';
-const pinDotsContainer=document.getElementById('pin-dots-container');
-for(let i=0;i<6;i++){ const d=document.createElement('div'); d.className='pin-dot'; d.id=`pindot${i}`; pinDotsContainer.appendChild(d); }
-function updatePinDots(){ for(let i=0;i<6;i++) document.getElementById(`pindot${i}`).classList.toggle('filled',i<pinEntry.length); }
-function pinPress(d){
-  if(pinEntry.length<6){
-    pinEntry+=d; updatePinDots();
-    if(pinEntry.length===6){
-      if(pinEntry===pinCode){
-        document.getElementById('pin-screen').classList.add('hidden');
-        loadFromS3();
-      } else {
-        document.getElementById('pin-error').innerText='wrong code';
-        setTimeout(()=>{ pinEntry=''; updatePinDots(); document.getElementById('pin-error').innerText=''; },700);
-      }
+// ----- Pin logic (keyboard + click) -----
+let pinEntry = '';
+const pinCode = '137900';
+const pinDotsContainer = document.getElementById('pin-dots-container');
+for (let i = 0; i < 6; i++) {
+  const dot = document.createElement('div');
+  dot.className = 'pin-dot';
+  dot.id = `pindot${i}`;
+  pinDotsContainer.appendChild(dot);
+}
+function updatePinDots() {
+  for (let i = 0; i < 6; i++) {
+    document.getElementById(`pindot${i}`).classList.toggle('filled', i < pinEntry.length);
+  }
+}
+function submitPin() {
+  if (pinEntry === pinCode) {
+    document.getElementById('pin-screen').classList.add('hidden');
+    loadFromS3();
+  } else {
+    document.getElementById('pin-error').innerText = 'wrong code';
+    setTimeout(() => {
+      pinEntry = '';
+      updatePinDots();
+      document.getElementById('pin-error').innerText = '';
+    }, 700);
+  }
+}
+function pinPress(digit) {
+  if (pinEntry.length < 6) {
+    pinEntry += digit;
+    updatePinDots();
+    if (pinEntry.length === 6) {
+      submitPin();
     }
   }
 }
-function pinDelete(){ pinEntry=pinEntry.slice(0,-1); updatePinDots(); }
-const keypad=document.getElementById('pin-keypad');
-[...'1234567890'].forEach(k=>{ const btn=document.createElement('div'); btn.className='pin-key'; btn.innerText=k; btn.onclick=()=>pinPress(k); keypad.appendChild(btn); });
-const del=document.createElement('div'); del.className='pin-key'; del.innerText='⌫'; del.onclick=pinDelete; keypad.appendChild(del);
+function pinDelete() {
+  pinEntry = pinEntry.slice(0, -1);
+  updatePinDots();
+}
+// Build keypad
+const keypad = document.getElementById('pin-keypad');
+const digits = [...'1234567890'];
+digits.forEach(d => {
+  const btn = document.createElement('div');
+  btn.className = 'pin-key';
+  btn.innerText = d;
+  btn.addEventListener('click', () => pinPress(d));
+  keypad.appendChild(btn);
+});
+const delBtn = document.createElement('div');
+delBtn.className = 'pin-key';
+delBtn.innerText = '⌫';
+delBtn.addEventListener('click', pinDelete);
+keypad.appendChild(delBtn);
 
-// Event listeners
-document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{ if(e.target===o) o.classList.remove('open'); }));
+// Keyboard support
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('pin-screen').classList.contains('hidden')) return;
+  if (e.key >= '0' && e.key <= '9') {
+    e.preventDefault();
+    pinPress(e.key);
+  } else if (e.key === 'Backspace' || e.key === 'Delete') {
+    e.preventDefault();
+    pinDelete();
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (pinEntry.length === 6) submitPin();
+  }
+});
+
+// Global event listeners
+document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 document.getElementById('globalFileInput').onchange = e => uploadFiles(Array.from(e.target.files), null, null, 'globalProgress');
-document.getElementById('globalUploadZone').addEventListener('dragover', e=>e.preventDefault());
-document.getElementById('globalUploadZone').addEventListener('drop', e=>{ e.preventDefault(); const files=Array.from(e.dataTransfer.files); uploadFiles(files,null,null,'globalProgress'); });
-document.getElementById('songSearch').addEventListener('input', ()=>renderSongs());
-document.getElementById('filterProjectSelect').addEventListener('change', ()=>renderSongs());
+document.getElementById('globalUploadZone').addEventListener('dragover', e => e.preventDefault());
+document.getElementById('globalUploadZone').addEventListener('drop', e => {
+  e.preventDefault();
+  const files = Array.from(e.dataTransfer.files);
+  uploadFiles(files, null, null, 'globalProgress');
+});
+document.getElementById('songSearch').addEventListener('input', () => renderSongs());
+document.getElementById('filterProjectSelect').addEventListener('change', () => renderSongs());
 document.getElementById('filterStatusSelect').innerHTML = '<option value="">All</option><option>idea</option><option>wip</option><option>demo</option><option>done</option><option>released</option>';
-document.getElementById('filterStatusSelect').addEventListener('change', ()=>renderSongs());
-document.getElementById('filesProjectFilter').addEventListener('change', ()=>renderFiles());
-document.getElementById('filesSongFilter').addEventListener('change', ()=>renderFiles());
-document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click', ()=>navigate(n.getAttribute('data-page'))));
-document.getElementById('hamburgerBtn').addEventListener('click', ()=>document.querySelector('.sidebar').classList.toggle('mobile-open'));
+document.getElementById('filterStatusSelect').addEventListener('change', () => renderSongs());
+document.getElementById('filesProjectFilter').addEventListener('change', () => renderFiles());
+document.getElementById('filesSongFilter').addEventListener('change', () => renderFiles());
+document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navigate(n.getAttribute('data-page'))));
+document.getElementById('hamburgerBtn').addEventListener('click', () => document.querySelector('.sidebar').classList.toggle('mobile-open'));
 
-// Globals
-window.openProjectModal=openProjectModal; window.openSongModal=openSongModal; window.saveProject=saveProject; window.saveSong=saveSong;
-window.openSongDetail=openSongDetail; window.playFile=playFile; window.downloadFile=downloadFile; window.deleteFileRecord=deleteFileRecord;
-window.openProjectDetail=openProjectDetail; window.deleteSong=deleteSong; window.filterByProject=filterByProject; window.navigate=navigate;
-window.closeModal=closeModal; window.closePlayer=closePlayer; window.handleSongUpload=handleSongUpload;
+// Expose global functions
+window.openProjectModal = openProjectModal; window.openSongModal = openSongModal;
+window.saveProject = saveProject; window.saveSong = saveSong;
+window.openSongDetail = openSongDetail; window.playFile = playFile;
+window.downloadFile = downloadFile; window.deleteFileRecord = deleteFileRecord;
+window.openProjectDetail = openProjectDetail; window.deleteSong = deleteSong;
+window.filterByProject = filterByProject; window.navigate = navigate;
+window.closeModal = closeModal; window.closePlayer = closePlayer;
+window.handleSongUpload = handleSongUpload;
 </script>
 </body>
 </html>
