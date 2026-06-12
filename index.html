@@ -751,18 +751,19 @@ const DB_KEY = 'data/db.json';
 // ----- App state -----
 let db = { projects: [], songs: [], files: [] };
 let editingProjectId = null, editingSongId = null, currentSongId = null, currentProjectId = null;
-let currentAudio = null; // track currently playing file id
+let currentAudio = null;
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function toast(msg, type='info') {
   const t = document.createElement('div');
   t.className = 'toast';
+  if (type === 'error') t.style.background = '#5a2020';
   t.innerText = msg;
   document.getElementById('toastContainer').appendChild(t);
-  setTimeout(() => t.remove(), 2500);
+  setTimeout(() => t.remove(), 3000);
 }
 
-// ----- S3 operations (unchanged) -----
+// ----- S3 operations -----
 async function loadFromS3() {
   try {
     const data = await s3.getObject({ Key: DB_KEY }).promise();
@@ -775,19 +776,26 @@ async function loadFromS3() {
   updateUI();
 }
 
-// Immediate save (used after critical operations)
+// Immediate, non‑debounced save – used after critical changes
 async function saveNow() {
-  const body = JSON.stringify({ projects: db.projects, songs: db.songs, files: db.files });
+  const body = JSON.stringify({ projects: db.projects, songs: db.songs, files: db.files }, null, 2);
   try {
-    await s3.putObject({ Key: DB_KEY, Body: body, ContentType: 'application/json' }).promise();
-    console.log('DB saved');
+    await s3.putObject({
+      Key: DB_KEY,
+      Body: body,
+      ContentType: 'application/json',
+      ACL: 'private'           // adjust if needed
+    }).promise();
+    console.log('DB saved successfully');
+    return true;
   } catch (e) {
-    console.warn('Save failed', e);
-    toast('Save failed');
+    console.error('Save failed', e);
+    toast('⚠️ Failed to update database: ' + e.message, 'error');
+    return false;
   }
 }
 
-// Debounced auto-save (used for less critical updates)
+// Debounced save for less critical updates
 let saveTimer = null;
 function saveToS3() {
   clearTimeout(saveTimer);
@@ -796,6 +804,7 @@ function saveToS3() {
 
 async function uploadFileToS3(file, songId, projectId, progressId) {
   const key = `audio/${projectId || 'global'}/${songId || 'misc'}/${Date.now()}_${file.name}`;
+  // Upload audio file
   const upload = s3.upload({
     Key: key,
     Body: file,
@@ -808,7 +817,9 @@ async function uploadFileToS3(file, songId, projectId, progressId) {
     });
   }
   await upload.promise();
-  db.files.push({
+  
+  // Create file record
+  const fileRecord = {
     id: uid(),
     songId,
     projectId,
@@ -816,9 +827,21 @@ async function uploadFileToS3(file, songId, projectId, progressId) {
     filename: file.name,
     size: file.size,
     uploaded: Date.now()
-  });
-  // Immediate save after upload to prevent data loss on refresh
-  await saveNow();
+  };
+  db.files.push(fileRecord);
+  
+  // Immediately persist the DB
+  const saved = await saveNow();
+  if (!saved) {
+    // Rollback the local file record if save failed
+    db.files = db.files.filter(f => f.id !== fileRecord.id);
+    toast('File uploaded but database update failed – refresh will lose this entry', 'error');
+    // Still show the file in current UI? Optionally remove it.
+    renderFiles();
+    if (progressId) document.getElementById(progressId).style.width = '0%';
+    return;
+  }
+  
   toast(`⬆️ ${file.name}`);
 }
 
@@ -945,7 +968,7 @@ async function uploadFiles(files, songId, projectId, progressId) {
   if (progressId) setTimeout(() => document.getElementById(progressId).style.width = '0%', 1000);
 }
 
-// ----- Custom player controls -----
+// ----- Custom player controls (unchanged) -----
 const audio = document.getElementById('audioPlayer');
 const playPauseBtn = document.getElementById('playPauseBtn');
 const progressBar = document.getElementById('progressBar');
@@ -954,6 +977,7 @@ const timeDisplay = document.getElementById('timeDisplay');
 const playerBar = document.getElementById('playerBar');
 
 function formatTime(seconds) {
+  if (isNaN(seconds)) return '0:00';
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   return mins + ':' + (secs < 10 ? '0' : '') + secs;
@@ -1022,10 +1046,16 @@ async function deleteFileRecord(id) {
   if (f) {
     await deleteS3Object(f.s3key);
     db.files = db.files.filter(x => x.id !== id);
-    await saveNow();
-    renderFiles();
-    toast('File deleted');
-    if (currentAudio === id) closePlayer();
+    const saved = await saveNow();
+    if (saved) {
+      renderFiles();
+      toast('File deleted');
+      if (currentAudio === id) closePlayer();
+    } else {
+      // Rollback
+      db.files.push(f);
+      toast('Delete failed', 'error');
+    }
   }
 }
 
@@ -1119,12 +1149,18 @@ function handleSongUpload(input, songId) {
 
 function deleteSong(id) {
   if (confirm('delete song and all its file references?')) {
-    // Also delete associated S3 files
-    const files = db.files.filter(f => f.songId === id);
-    files.forEach(async f => await deleteS3Object(f.s3key));
+    const filesToDelete = db.files.filter(f => f.songId === id);
+    // Delete S3 objects in parallel
+    Promise.all(filesToDelete.map(f => deleteS3Object(f.s3key)));
     db.songs = db.songs.filter(s => s.id !== id);
     db.files = db.files.filter(f => f.songId !== id);
-    saveNow(); closeModal('songDetailModal'); updateUI(); toast('song removed');
+    saveNow().then(saved => {
+      if (saved) {
+        closeModal('songDetailModal'); updateUI(); toast('song removed');
+      } else {
+        toast('Delete failed', 'error');
+      }
+    });
   }
 }
 
@@ -1212,7 +1248,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Enter') { e.preventDefault(); if (pinEntry.length === 6) submitPin(); }
 });
 
-// ----- Global event listeners (mostly unchanged) -----
+// ----- Global event listeners -----
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 document.getElementById('globalFileInput').onchange = e => uploadFiles(Array.from(e.target.files), null, null, 'globalProgress');
 document.getElementById('globalUploadZone').addEventListener('dragover', e => e.preventDefault());
