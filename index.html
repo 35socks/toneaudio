@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <title>ToneAudio — Untitled Studio</title>
-  
-  <!-- Embedded AWS config – no external file needed -->
+
+  <!-- Embedded AWS config -->
   <script>
     window.CONFIG = {
       aws: {
@@ -17,7 +17,10 @@
       }
     };
   </script>
-  
+
+  <!-- AWS SDK -->
+  <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1613.0.min.js"></script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -652,74 +655,29 @@
 
 <div class="toast-container" id="toastContainer"></div>
 
-<!-- modals -->
+<!-- modals (unchanged) -->
 <div class="modal-overlay" id="projectModal"><div class="modal"><div class="modal-header"><h3 id="projectModalTitle">New Project</h3><button class="modal-close" onclick="closeModal('projectModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="projName" placeholder="Name"><input id="projGenre" placeholder="Genre"><input id="projColor" type="color" value="#ffffff"><textarea id="projNotes" placeholder="Notes..." rows="3"></textarea><div style="display:flex; gap:12px; justify-content:flex-end; margin-top:24px;"><button class="btn btn-ghost" onclick="closeModal('projectModal')">Cancel</button><button class="btn btn-primary" onclick="saveProject()">Save</button></div></div></div></div>
 <div class="modal-overlay" id="songModal"><div class="modal"><div class="modal-header"><h3 id="songModalTitle">New Song</h3><button class="modal-close" onclick="closeModal('songModal')">✕</button></div><div class="modal-body" style="padding:20px 32px 28px;"><input id="songTitle" placeholder="Title"><select id="songProjectSelect"></select><select id="songStatusSelect"><option>idea</option><option>wip</option><option>demo</option><option>done</option><option>released</option></select><input id="songBpm" placeholder="BPM"><input id="songKey" placeholder="Key"><textarea id="songLyrics" placeholder="Lyrics" rows="4"></textarea><textarea id="songNotes" placeholder="Notes" rows="2"></textarea><div class="form-actions" style="display:flex; gap:12px; justify-content:flex-end; margin-top:20px;"><button class="btn btn-ghost" onclick="closeModal('songModal')">Cancel</button><button class="btn btn-primary" onclick="saveSong()">Save</button></div></div></div></div>
 <div class="modal-overlay" id="songDetailModal"><div class="modal" style="max-width: 720px;"><div class="modal-header"><h3 id="detailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="detailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('songDetailModal')">✕</button></div></div><div class="modal-body" id="songDetailBody" style="padding:20px 32px 28px;"></div></div></div>
 <div class="modal-overlay" id="projectDetailModal"><div class="modal"><div class="modal-header"><h3 id="projDetailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="projDetailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('projectDetailModal')">✕</button></div></div><div class="modal-body" id="projectDetailBody" style="padding:20px 32px 28px;"></div></div></div>
 
 <script>
-// ----- AWS config (now embedded above, no external file) -----
-const awsConfig = (window.CONFIG && window.CONFIG.aws) ? window.CONFIG.aws : null;
-const hasValidAws = awsConfig && awsConfig.accessKey && awsConfig.secretKey && awsConfig.region && awsConfig.bucket;
+// ----- AWS SDK initialization -----
+const awsConfig = window.CONFIG?.aws || {};
+AWS.config.update({
+  accessKeyId: awsConfig.accessKey,
+  secretAccessKey: awsConfig.secretKey,
+  region: awsConfig.region
+});
+const s3 = new AWS.S3({ apiVersion: '2006-03-01', params: { Bucket: awsConfig.bucket } });
+const DB_KEY = 'data/db.json';
 
-if (!hasValidAws) {
-  const toastEl = document.createElement('div');
-  toastEl.className = 'toast';
-  toastEl.innerText = '⚠️ AWS config missing – cannot load/save files';
-  toastEl.style.background = '#5a2020';
-  toastEl.style.borderColor = '#ff4d4d';
-  document.getElementById('toastContainer').appendChild(toastEl);
-}
-
+// ----- App state -----
 let db = { projects: [], songs: [], files: [] };
 let editingProjectId = null, editingSongId = null, currentSongId = null, currentProjectId = null;
 let saveTimer = null;
-const DB_KEY = 'data/db.json';
 
-function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2); }
-async function sha256(msg) { const encoder = new TextEncoder(); const data = encoder.encode(msg); const hash = await crypto.subtle.digest('SHA-256', data); return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
-async function hmacSHA256(key, msg) { const encoder = new TextEncoder(); const cryptoKey = await crypto.subtle.importKey('raw', encoder.encode(key), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']); const sig = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(msg)); return Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
-async function getSignatureKey(key, dateStamp, region, service) { let kDate = await hmacSHA256('AWS4'+key, dateStamp); let kRegion = await hmacSHA256(kDate, region); let kService = await hmacSHA256(kRegion, service); return await hmacSHA256(kService, 'aws4_request'); }
-async function s3Presigned(method, key, expires=900) {
-  if (!hasValidAws) throw new Error('AWS not configured');
-  const { accessKey, secretKey, region, bucket } = awsConfig;
-  const now = new Date(); const amzDate = now.toISOString().replace(/[:\-]|\.\d{3}/g, ''); const dateStamp = amzDate.slice(0,8);
-  const host = `${bucket}.s3.${region}.amazonaws.com`; const encodedKey = encodeURIComponent(key).replace(/%2F/g, '/');
-  const q = `X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=${accessKey}%2F${dateStamp}%2F${region}%2Fs3%2Faws4_request&X-Amz-Date=${amzDate}&X-Amz-Expires=${expires}&X-Amz-SignedHeaders=host`;
-  const canonicalRequest = `${method}\n/${encodedKey}\n${q}\nhost:${host}\n\nhost\nUNSIGNED-PAYLOAD`;
-  const hash = await sha256(canonicalRequest);
-  const scope = `${dateStamp}/${region}/s3/aws4_request`;
-  const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${scope}\n${hash}`;
-  const signingKey = await getSignatureKey(secretKey, dateStamp, region, 's3');
-  const signature = await hmacSHA256(signingKey, stringToSign);
-  return `https://${host}/${encodedKey}?${q}&X-Amz-Signature=${signature}`;
-}
-async function s3Put(key, file, prog) { const url = await s3Presigned('PUT', key, 900); return new Promise((res,rej)=>{ const xhr=new XMLHttpRequest(); xhr.open('PUT',url); xhr.upload.onprogress=e=>prog&&prog(e.loaded/e.total); xhr.onload=()=>xhr.status===200?res():rej(); xhr.send(file); }); }
-async function loadFromS3() {
-  if (!hasValidAws) return;
-  try {
-    const url = await s3Presigned('GET', DB_KEY, 3600);
-    const resp = await fetch(url);
-    if (resp.ok) {
-      const data = await resp.json();
-      db = data;
-      toast('Data loaded from vault');
-    }
-  } catch(e) {
-    console.warn('Could not load from S3', e);
-  }
-  updateUI();
-}
-function saveToS3() {
-  if (!hasValidAws) return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    const blob = new Blob([JSON.stringify({projects:db.projects,songs:db.songs,files:db.files})], {type:'application/json'});
-    await s3Put(DB_KEY, blob);
-    toast('auto-saved');
-  }, 500);
-}
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function toast(msg, type='info') {
   const t = document.createElement('div');
   t.className = 'toast';
@@ -728,64 +686,123 @@ function toast(msg, type='info') {
   setTimeout(() => t.remove(), 2500);
 }
 
-function esc(s){ return String(s??'').replace(/[&<>]/g,function(m){if(m==='&')return'&amp;';if(m==='<')return'&lt;';if(m==='>')return'&gt;';return m;});}
-function fmtSize(b){ if(!b) return '0 B'; if(b<1024) return b+' B'; if(b<1e6) return (b/1024).toFixed(1)+' KB'; return (b/1e6).toFixed(1)+' MB';}
+// ----- S3 operations using SDK -----
+async function loadFromS3() {
+  try {
+    const data = await s3.getObject({ Key: DB_KEY }).promise();
+    const json = JSON.parse(data.Body.toString('utf-8'));
+    db = json;
+    toast('Data loaded from vault');
+  } catch (e) {
+    console.warn('Could not load from S3', e);
+  }
+  updateUI();
+}
 
-function updateUI(){ renderDashboard(); renderProjects(); renderSongs(); renderFiles(); renderSidebarProjects(); updateSelects(); }
-function renderDashboard(){
-  document.getElementById('dash-date').innerText = new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric'});
+async function saveToS3() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const body = JSON.stringify({ projects: db.projects, songs: db.songs, files: db.files });
+    try {
+      await s3.putObject({ Key: DB_KEY, Body: body, ContentType: 'application/json' }).promise();
+      toast('auto-saved');
+    } catch (e) {
+      console.warn('Save failed', e);
+      toast('Save failed');
+    }
+  }, 500);
+}
+
+async function uploadFileToS3(file, songId, projectId, progressId) {
+  const key = `audio/${projectId || 'global'}/${songId || 'misc'}/${Date.now()}_${file.name}`;
+  const upload = s3.upload({
+    Key: key,
+    Body: file,
+    ContentType: file.type || 'audio/mpeg'
+  });
+  if (progressId) {
+    upload.on('httpUploadProgress', (progress) => {
+      const pct = Math.round((progress.loaded / progress.total) * 100);
+      document.getElementById(progressId).style.width = pct + '%';
+    });
+  }
+  await upload.promise();
+  db.files.push({
+    id: uid(),
+    songId,
+    projectId,
+    s3key: key,
+    filename: file.name,
+    size: file.size,
+    uploaded: Date.now()
+  });
+  saveToS3();
+  toast(`⬆️ ${file.name}`);
+}
+
+async function getSignedUrl(key) {
+  return s3.getSignedUrl('getObject', { Key: key, Expires: 3600 });
+}
+
+// ----- UI helpers -----
+function esc(s) { return String(s ?? '').replace(/[&<>]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[m])); }
+function fmtSize(b) { if (!b) return '0 B'; if (b < 1024) return b + ' B'; if (b < 1e6) return (b / 1024).toFixed(1) + ' KB'; return (b / 1e6).toFixed(1) + ' MB'; }
+
+function updateUI() { renderDashboard(); renderProjects(); renderSongs(); renderFiles(); renderSidebarProjects(); updateSelects(); }
+function renderDashboard() {
+  document.getElementById('dash-date').innerText = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-card"><div class="stat-card-value">${db.projects.length}</div><div class="stat-card-label">Projects</div></div>
     <div class="stat-card"><div class="stat-card-value">${db.songs.length}</div><div class="stat-card-label">Songs</div></div>
     <div class="stat-card"><div class="stat-card-value">${db.files.length}</div><div class="stat-card-label">Files</div></div>
-    <div class="stat-card"><div class="stat-card-value">${db.songs.filter(s=>s.status==='done'||s.status==='released').length}</div><div class="stat-card-label">Finished</div></div>`;
-  const recent = [...db.songs].sort((a,b)=>b.created-a.created).slice(0,6);
-  document.getElementById('recentList').innerHTML = recent.map(s=>`
+    <div class="stat-card"><div class="stat-card-value">${db.songs.filter(s => s.status === 'done' || s.status === 'released').length}</div><div class="stat-card-label">Finished</div></div>`;
+  const recent = [...db.songs].sort((a, b) => b.created - a.created).slice(0, 6);
+  document.getElementById('recentList').innerHTML = recent.map(s => `
     <div class="song-row" style="margin-bottom:6px;" onclick="openSongDetail('${s.id}')">
       <span>🎧</span>
       <span><strong>${esc(s.title)}</strong></span>
       <span class="status-badge status-${s.status}">${s.status}</span>
     </div>`).join('') || '<div class="empty-state" style="padding:20px;opacity:0.5;">No songs yet</div>';
 }
-function renderSidebarProjects(){
-  const list = db.projects.map(p=>`<div class="project-chip" onclick="filterByProject('${p.id}')"><div class="project-dot" style="background:${p.colour||'#fff'}"></div>${esc(p.name)}</div>`).join('');
-  document.getElementById('sidebarProjectsList').innerHTML = `<div class="section-label">PROJECTS</div>${list||'<div style="padding:12px; font-size:0.8rem; opacity:0.5;">none</div>'}`;
+function renderSidebarProjects() {
+  const list = db.projects.map(p => `<div class="project-chip" onclick="filterByProject('${p.id}')"><div class="project-dot" style="background:${p.colour || '#fff'}"></div>${esc(p.name)}</div>`).join('');
+  document.getElementById('sidebarProjectsList').innerHTML = `<div class="section-label">PROJECTS</div>${list || '<div style="padding:12px; font-size:0.8rem; opacity:0.5;">none</div>'}`;
 }
-function filterByProject(id){ navigate('songs'); document.getElementById('filterProjectSelect').value=id; renderSongs(); }
-function renderProjects(){
-  document.getElementById('projectsGrid').innerHTML = db.projects.map(p=>`
+function filterByProject(id) { navigate('songs'); document.getElementById('filterProjectSelect').value = id; renderSongs(); }
+function renderProjects() {
+  document.getElementById('projectsGrid').innerHTML = db.projects.map(p => `
     <div class="card" onclick="openProjectDetail('${p.id}')">
       <div style="display:flex;gap:12px;align-items:center">
-        <div style="width:12px;height:12px;border-radius:4px;background:${p.colour||'#fff'}"></div>
+        <div style="width:12px;height:12px;border-radius:4px;background:${p.colour || '#fff'}"></div>
         <strong style="font-size:1.3rem;">${esc(p.name)}</strong>
       </div>
-      <div style="color:var(--text-muted);font-size:0.8rem; margin-top:8px;">${esc(p.genre||'no genre')}</div>
+      <div style="color:var(--text-muted);font-size:0.8rem; margin-top:8px;">${esc(p.genre || 'no genre')}</div>
       <div style="margin-top:16px; display:flex; gap:16px; font-size:0.85rem;">
-        <span>📀 ${db.songs.filter(s=>s.projectId===p.id).length}</span>
-        <span>🎵 ${db.files.filter(f=>f.projectId===p.id).length}</span>
+        <span>📀 ${db.songs.filter(s => s.projectId === p.id).length}</span>
+        <span>🎵 ${db.files.filter(f => f.projectId === p.id).length}</span>
       </div>
     </div>`).join('') || '<div class="empty-state" style="grid-column:1/-1; padding:40px; opacity:0.5;">create first project</div>';
 }
-function renderSongs(){
+function renderSongs() {
   const filterProj = document.getElementById('filterProjectSelect')?.value;
   const filterStat = document.getElementById('filterStatusSelect')?.value;
   const search = document.getElementById('songSearch')?.value.toLowerCase();
-  let list = db.songs.filter(s=>(!filterProj||s.projectId===filterProj)&&(!filterStat||s.status===filterStat)&&(!search||s.title.toLowerCase().includes(search)));
-  document.getElementById('songsListContainer').innerHTML = list.map((s,i)=>`
+  let list = db.songs.filter(s => (!filterProj || s.projectId === filterProj) && (!filterStat || s.status === filterStat) && (!search || s.title.toLowerCase().includes(search)));
+  document.getElementById('songsListContainer').innerHTML = list.map((s, i) => `
     <div class="song-row" onclick="openSongDetail('${s.id}')">
-      <span style="opacity:0.4;">${String(i+1).padStart(2,'0')}</span>
+      <span style="opacity:0.4;">${String(i + 1).padStart(2, '0')}</span>
       <span><strong>${esc(s.title)}</strong></span>
-      <span class="song-project">${db.projects.find(p=>p.id===s.projectId)?.name||'—'}</span>
-      <span class="song-key">${esc(s.key||'-')}</span>
-      <span class="song-bpm">${s.bpm||'—'}bpm</span>
+      <span class="song-project">${db.projects.find(p => p.id === s.projectId)?.name || '—'}</span>
+      <span class="song-key">${esc(s.key || '-')}</span>
+      <span class="song-bpm">${s.bpm || '—'}bpm</span>
       <span class="status-badge status-${s.status}">${s.status}</span>
     </div>`).join('') || '<div class="empty-state" style="padding:24px;opacity:0.5;">no songs</div>';
 }
-function renderFiles(){
+function renderFiles() {
   const projFilter = document.getElementById('filesProjectFilter')?.value;
   const songFilter = document.getElementById('filesSongFilter')?.value;
-  let filtered = db.files.filter(f=>(!projFilter||f.projectId===projFilter)&&(!songFilter||f.songId===songFilter));
-  document.getElementById('globalFilesList').innerHTML = filtered.map(f=>`
+  let filtered = db.files.filter(f => (!projFilter || f.projectId === projFilter) && (!songFilter || f.songId === songFilter));
+  document.getElementById('globalFilesList').innerHTML = filtered.map(f => `
     <div class="file-row">
       <span>🎵</span>
       <span style="flex:1;">${esc(f.filename)}</span>
@@ -797,193 +814,188 @@ function renderFiles(){
       </div>
     </div>`).join('') || '<div class="empty-state" style="padding:24px;opacity:0.5;">no files</div>';
 }
-function updateSelects(){
+function updateSelects() {
   const getVal = (id) => { const el = document.getElementById(id); return el ? el.value : ''; };
   const projFilterVal = getVal('filterProjectSelect');
   const filesProjVal = getVal('filesProjectFilter');
   const filesSongVal = getVal('filesSongFilter');
   const songProjVal = getVal('songProjectSelect');
 
-  const projOpts = '<option value="">All Projects</option>'+db.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  const projOpts = '<option value="">All Projects</option>' + db.projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
   document.getElementById('filterProjectSelect').innerHTML = projOpts;
   document.getElementById('filesProjectFilter').innerHTML = projOpts;
 
-  const songOpts = '<option value="">All Songs</option>'+db.songs.map(s=>`<option value="${s.id}">${esc(s.title)}</option>`).join('');
+  const songOpts = '<option value="">All Songs</option>' + db.songs.map(s => `<option value="${s.id}">${esc(s.title)}</option>`).join('');
   document.getElementById('filesSongFilter').innerHTML = songOpts;
 
-  document.getElementById('songProjectSelect').innerHTML = '<option value="">— none —</option>'+db.projects.map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('');
+  document.getElementById('songProjectSelect').innerHTML = '<option value="">— none —</option>' + db.projects.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('');
 
-  try { if (projFilterVal) document.getElementById('filterProjectSelect').value = projFilterVal; } catch(e){}
-  try { if (filesProjVal) document.getElementById('filesProjectFilter').value = filesProjVal; } catch(e){}
-  try { if (filesSongVal) document.getElementById('filesSongFilter').value = filesSongVal; } catch(e){}
-  try { if (songProjVal) document.getElementById('songProjectSelect').value = songProjVal; } catch(e){}
+  try { if (projFilterVal) document.getElementById('filterProjectSelect').value = projFilterVal; } catch (e) {}
+  try { if (filesProjVal) document.getElementById('filesProjectFilter').value = filesProjVal; } catch (e) {}
+  try { if (filesSongVal) document.getElementById('filesSongFilter').value = filesSongVal; } catch (e) {}
+  try { if (songProjVal) document.getElementById('songProjectSelect').value = songProjVal; } catch (e) {}
 }
-function navigate(page){
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+function navigate(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(`page-${page}`).classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const navItem = document.querySelector(`.nav-item[data-page="${page}"]`);
   if (navItem) navItem.classList.add('active');
-  if(page==='dashboard')renderDashboard();
-  if(page==='projects')renderProjects();
-  if(page==='songs')renderSongs();
-  if(page==='files')renderFiles();
+  if (page === 'dashboard') renderDashboard();
+  if (page === 'projects') renderProjects();
+  if (page === 'songs') renderSongs();
+  if (page === 'files') renderFiles();
 }
-async function uploadFiles(files, songId, projectId, progressId){
-  if (!hasValidAws) { toast('AWS not configured'); return; }
-  for(let file of files){
-    const key = `audio/${projectId||'global'}/${songId||'misc'}/${Date.now()}_${file.name}`;
-    await s3Put(key, file, pct=>{ if(progressId) document.getElementById(progressId).style.width = (pct*100)+'%'; });
-    db.files.push({id:uid(),songId,projectId,s3key:key,filename:file.name,size:file.size,uploaded:Date.now()});
-    saveToS3();
-    toast(`⬆️ ${file.name}`);
+async function uploadFiles(files, songId, projectId, progressId) {
+  for (let file of files) {
+    await uploadFileToS3(file, songId, projectId, progressId);
   }
   renderFiles();
-  if(songId && document.getElementById('songDetailModal').classList.contains('open')) openSongDetail(songId);
-  if(progressId) setTimeout(()=>document.getElementById(progressId).style.width='0%',1000);
+  if (songId && document.getElementById('songDetailModal').classList.contains('open')) openSongDetail(songId);
+  if (progressId) setTimeout(() => document.getElementById(progressId).style.width = '0%', 1000);
 }
-async function playFile(id){
-  const f = db.files.find(x=>x.id===id);
-  if(!f) return;
-  const url = await s3Presigned('GET', f.s3key, 3600);
+async function playFile(id) {
+  const f = db.files.find(x => x.id === id);
+  if (!f) return;
+  const url = await getSignedUrl(f.s3key);
   const audio = document.getElementById('audioPlayer');
   audio.src = url;
   audio.play();
   document.getElementById('playerTitle').innerText = f.filename;
-  document.getElementById('playerSub').innerText = db.songs.find(s=>s.id===f.songId)?.title || '';
+  document.getElementById('playerSub').innerText = db.songs.find(s => s.id === f.songId)?.title || '';
   document.getElementById('playerBar').classList.add('visible');
 }
-function closePlayer(){
+function closePlayer() {
   const a = document.getElementById('audioPlayer');
   a.pause();
   a.src = '';
   document.getElementById('playerBar').classList.remove('visible');
 }
-async function downloadFile(id){
-  const f = db.files.find(x=>x.id===id);
-  if(!f) return;
-  const url = await s3Presigned('GET', f.s3key, 3600);
+async function downloadFile(id) {
+  const f = db.files.find(x => x.id === id);
+  if (!f) return;
+  const url = await getSignedUrl(f.s3key);
   window.open(url);
 }
-function deleteFileRecord(id){
-  db.files = db.files.filter(f=>f.id!==id);
+function deleteFileRecord(id) {
+  db.files = db.files.filter(f => f.id !== id);
   saveToS3();
   renderFiles();
   toast('removed from catalog');
 }
-function openProjectModal(id){
+function openProjectModal(id) {
   editingProjectId = id;
-  const p = id ? db.projects.find(x=>x.id===id) : null;
-  document.getElementById('projName').value = p?.name||'';
-  document.getElementById('projGenre').value = p?.genre||'';
-  document.getElementById('projColor').value = p?.colour||'#ffffff';
-  document.getElementById('projNotes').value = p?.notes||'';
+  const p = id ? db.projects.find(x => x.id === id) : null;
+  document.getElementById('projName').value = p?.name || '';
+  document.getElementById('projGenre').value = p?.genre || '';
+  document.getElementById('projColor').value = p?.colour || '#ffffff';
+  document.getElementById('projNotes').value = p?.notes || '';
   openModal('projectModal');
 }
-function saveProject(){
+function saveProject() {
   const name = document.getElementById('projName').value.trim();
-  if(!name) return;
-  if(editingProjectId){
-    const p = db.projects.find(x=>x.id===editingProjectId);
-    p.name=name; p.genre=document.getElementById('projGenre').value; p.colour=document.getElementById('projColor').value; p.notes=document.getElementById('projNotes').value;
+  if (!name) return;
+  if (editingProjectId) {
+    const p = db.projects.find(x => x.id === editingProjectId);
+    p.name = name; p.genre = document.getElementById('projGenre').value; p.colour = document.getElementById('projColor').value; p.notes = document.getElementById('projNotes').value;
   } else {
-    db.projects.push({id:uid(),name,genre:document.getElementById('projGenre').value,colour:document.getElementById('projColor').value,notes:document.getElementById('projNotes').value,created:Date.now()});
+    db.projects.push({ id: uid(), name, genre: document.getElementById('projGenre').value, colour: document.getElementById('projColor').value, notes: document.getElementById('projNotes').value, created: Date.now() });
   }
   saveToS3(); closeModal('projectModal'); updateUI();
 }
-function openSongModal(id){
+function openSongModal(id) {
   editingSongId = id;
-  const s = id ? db.songs.find(x=>x.id===id) : null;
-  document.getElementById('songTitle').value = s?.title||'';
-  document.getElementById('songProjectSelect').value = s?.projectId||'';
-  document.getElementById('songStatusSelect').value = s?.status||'idea';
-  document.getElementById('songBpm').value = s?.bpm||'';
-  document.getElementById('songKey').value = s?.key||'';
-  document.getElementById('songLyrics').value = s?.lyrics||'';
-  document.getElementById('songNotes').value = s?.notes||'';
+  const s = id ? db.songs.find(x => x.id === id) : null;
+  document.getElementById('songTitle').value = s?.title || '';
+  document.getElementById('songProjectSelect').value = s?.projectId || '';
+  document.getElementById('songStatusSelect').value = s?.status || 'idea';
+  document.getElementById('songBpm').value = s?.bpm || '';
+  document.getElementById('songKey').value = s?.key || '';
+  document.getElementById('songLyrics').value = s?.lyrics || '';
+  document.getElementById('songNotes').value = s?.notes || '';
   openModal('songModal');
 }
-function saveSong(){
+function saveSong() {
   const title = document.getElementById('songTitle').value.trim();
-  if(!title) return;
+  if (!title) return;
   const data = {
     title,
-    projectId: document.getElementById('songProjectSelect').value||null,
+    projectId: document.getElementById('songProjectSelect').value || null,
     status: document.getElementById('songStatusSelect').value,
-    bpm: parseInt(document.getElementById('songBpm').value)||null,
+    bpm: parseInt(document.getElementById('songBpm').value) || null,
     key: document.getElementById('songKey').value,
     lyrics: document.getElementById('songLyrics').value,
     notes: document.getElementById('songNotes').value,
     created: Date.now()
   };
-  if(editingSongId){
-    Object.assign(db.songs.find(s=>s.id===editingSongId), data);
+  if (editingSongId) {
+    Object.assign(db.songs.find(s => s.id === editingSongId), data);
   } else {
-    db.songs.push({id:uid(), ...data});
+    db.songs.push({ id: uid(), ...data });
   }
   saveToS3(); closeModal('songModal'); updateUI();
 }
-function openSongDetail(id){
+function openSongDetail(id) {
   currentSongId = id;
-  const s = db.songs.find(x=>x.id===id);
-  if(!s) return;
-  const files = db.files.filter(f=>f.songId===id);
-  const proj = db.projects.find(p=>p.id===s.projectId);
+  const s = db.songs.find(x => x.id === id);
+  if (!s) return;
+  const files = db.files.filter(f => f.songId === id);
+  const proj = db.projects.find(p => p.id === s.projectId);
   document.getElementById('detailTitle').innerText = s.title;
   document.getElementById('songDetailBody').innerHTML = `
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-      <div><label style="opacity:0.6; font-size:0.8rem;">Project</label><div>${proj?.name||'—'}</div></div>
+      <div><label style="opacity:0.6; font-size:0.8rem;">Project</label><div>${proj?.name || '—'}</div></div>
       <div><label style="opacity:0.6; font-size:0.8rem;">Status</label><div class="status-badge status-${s.status}">${s.status}</div></div>
-      <div><label style="opacity:0.6; font-size:0.8rem;">BPM</label><div>${s.bpm||'—'}</div></div>
-      <div><label style="opacity:0.6; font-size:0.8rem;">Key</label><div>${esc(s.key||'—')}</div></div>
+      <div><label style="opacity:0.6; font-size:0.8rem;">BPM</label><div>${s.bpm || '—'}</div></div>
+      <div><label style="opacity:0.6; font-size:0.8rem;">Key</label><div>${esc(s.key || '—')}</div></div>
     </div>
     ${s.lyrics ? `<div style="margin-top:20px;"><label style="opacity:0.6; font-size:0.8rem;">Lyrics</label><div style="background:#0b0d12; padding:16px; border-radius:16px; margin-top:6px;">${esc(s.lyrics)}</div></div>` : ''}
-    <div style="margin-top:24px;"><div class="section-label">Audio files</div>${files.map(f=>`<div class="file-row"><span>🎵</span><span style="flex:1;">${esc(f.filename)}</span><div><button class="btn btn-ghost btn-sm" onclick="playFile('${f.id}')">▶</button><button class="btn btn-ghost btn-sm" onclick="downloadFile('${f.id}')">↓</button></div></div>`).join('')||'<div style="opacity:0.5; padding:12px;">none</div>'}</div>
+    <div style="margin-top:24px;"><div class="section-label">Audio files</div>${files.map(f => `<div class="file-row"><span>🎵</span><span style="flex:1;">${esc(f.filename)}</span><div><button class="btn btn-ghost btn-sm" onclick="playFile('${f.id}')">▶</button><button class="btn btn-ghost btn-sm" onclick="downloadFile('${f.id}')">↓</button></div></div>`).join('') || '<div style="opacity:0.5; padding:12px;">none</div>'}</div>
     <div class="upload-zone" style="margin-top:20px;">
       <input type="file" multiple accept="audio/*" id="songUploadInput" onchange="handleSongUpload(this, '${id}')">
       <div style="margin-top:8px;">➕ upload for this song</div>
       <div class="upload-progress" style="height:3px; background:#1a1e26; margin-top:12px; border-radius:2px;"><div id="songDetailProgress" style="width:0%;height:100%;background:white; border-radius:2px;"></div></div>
     </div>
     <div style="margin-top:28px;"><button class="btn btn-danger btn-sm" onclick="deleteSong('${id}')">Delete Song</button></div>`;
-  document.getElementById('detailEditBtn').onclick = ()=>{ closeModal('songDetailModal'); openSongModal(id); };
+  document.getElementById('detailEditBtn').onclick = () => { closeModal('songDetailModal'); openSongModal(id); };
   openModal('songDetailModal');
 }
-function handleSongUpload(input, songId){
+function handleSongUpload(input, songId) {
   const files = Array.from(input.files);
-  const song = db.songs.find(s=>s.id===songId);
-  uploadFiles(files, songId, song?.projectId||null, 'songDetailProgress');
+  const song = db.songs.find(s => s.id === songId);
+  uploadFiles(files, songId, song?.projectId || null, 'songDetailProgress');
 }
-function deleteSong(id){
-  if(confirm('delete song and references?')){
-    db.songs = db.songs.filter(s=>s.id!==id);
-    db.files = db.files.filter(f=>f.songId!==id);
+function deleteSong(id) {
+  if (confirm('delete song and references?')) {
+    db.songs = db.songs.filter(s => s.id !== id);
+    db.files = db.files.filter(f => f.songId !== id);
     saveToS3(); closeModal('songDetailModal'); updateUI(); toast('song removed');
   }
 }
-function openProjectDetail(id){
+function openProjectDetail(id) {
   currentProjectId = id;
-  const p = db.projects.find(x=>x.id===id);
-  const songs = db.songs.filter(s=>s.projectId===id);
+  const p = db.projects.find(x => x.id === id);
+  const songs = db.songs.filter(s => s.projectId === id);
   document.getElementById('projDetailTitle').innerText = p.name;
   document.getElementById('projectDetailBody').innerHTML = `
-    <p style="opacity:0.8;">${esc(p.notes||'')}</p>
+    <p style="opacity:0.8;">${esc(p.notes || '')}</p>
     <div class="section-label" style="margin-top:24px;">Songs</div>
-    ${songs.map(s=>`<div class="song-row" onclick="openSongDetail('${s.id}')"><span>🎵</span>${esc(s.title)}<span class="status-badge status-${s.status}">${s.status}</span></div>`).join('')||'<div style="opacity:0.5; padding:12px;">no songs</div>'}
+    ${songs.map(s => `<div class="song-row" onclick="openSongDetail('${s.id}')"><span>🎵</span>${esc(s.title)}<span class="status-badge status-${s.status}">${s.status}</span></div>`).join('') || '<div style="opacity:0.5; padding:12px;">no songs</div>'}
     <button class="btn btn-danger btn-sm" style="margin-top:28px;" onclick="deleteProject('${id}')">Delete Project</button>`;
-  document.getElementById('projDetailEditBtn').onclick = ()=>{ closeModal('projectDetailModal'); openProjectModal(id); };
+  document.getElementById('projDetailEditBtn').onclick = () => { closeModal('projectDetailModal'); openProjectModal(id); };
   openModal('projectDetailModal');
 }
-function deleteProject(id){
-  if(confirm('delete project? songs unassigned')){
-    db.projects = db.projects.filter(p=>p.id!==id);
-    db.songs.forEach(s=>{if(s.projectId===id)s.projectId=null;});
+function deleteProject(id) {
+  if (confirm('delete project? songs unassigned')) {
+    db.projects = db.projects.filter(p => p.id !== id);
+    db.songs.forEach(s => { if (s.projectId === id) s.projectId = null; });
     saveToS3(); closeModal('projectDetailModal'); updateUI();
   }
 }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function openModal(id) { document.getElementById(id).classList.add('open'); }
 
-// ----- Pin logic (keyboard + click) -----
+// ----- Pin logic (unchanged) -----
 let pinEntry = '';
 const pinCode = '137900';
 const pinDotsContainer = document.getElementById('pin-dots-container');
@@ -1015,19 +1027,15 @@ function pinPress(digit) {
   if (pinEntry.length < 6) {
     pinEntry += digit;
     updatePinDots();
-    if (pinEntry.length === 6) {
-      submitPin();
-    }
+    if (pinEntry.length === 6) submitPin();
   }
 }
 function pinDelete() {
   pinEntry = pinEntry.slice(0, -1);
   updatePinDots();
 }
-// Build keypad
 const keypad = document.getElementById('pin-keypad');
-const digits = [...'1234567890'];
-digits.forEach(d => {
+[...'1234567890'].forEach(d => {
   const btn = document.createElement('div');
   btn.className = 'pin-key';
   btn.innerText = d;
@@ -1039,23 +1047,14 @@ delBtn.className = 'pin-key';
 delBtn.innerText = '⌫';
 delBtn.addEventListener('click', pinDelete);
 keypad.appendChild(delBtn);
-
-// Keyboard support
 document.addEventListener('keydown', (e) => {
   if (document.getElementById('pin-screen').classList.contains('hidden')) return;
-  if (e.key >= '0' && e.key <= '9') {
-    e.preventDefault();
-    pinPress(e.key);
-  } else if (e.key === 'Backspace' || e.key === 'Delete') {
-    e.preventDefault();
-    pinDelete();
-  } else if (e.key === 'Enter') {
-    e.preventDefault();
-    if (pinEntry.length === 6) submitPin();
-  }
+  if (e.key >= '0' && e.key <= '9') { e.preventDefault(); pinPress(e.key); }
+  else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); pinDelete(); }
+  else if (e.key === 'Enter') { e.preventDefault(); if (pinEntry.length === 6) submitPin(); }
 });
 
-// Global event listeners
+// ----- Global event listeners -----
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 document.getElementById('globalFileInput').onchange = e => uploadFiles(Array.from(e.target.files), null, null, 'globalProgress');
 document.getElementById('globalUploadZone').addEventListener('dragover', e => e.preventDefault());
@@ -1073,7 +1072,7 @@ document.getElementById('filesSongFilter').addEventListener('change', () => rend
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navigate(n.getAttribute('data-page'))));
 document.getElementById('hamburgerBtn').addEventListener('click', () => document.querySelector('.sidebar').classList.toggle('mobile-open'));
 
-// Expose global functions
+// Expose globals for onclick handlers
 window.openProjectModal = openProjectModal; window.openSongModal = openSongModal;
 window.saveProject = saveProject; window.saveSong = saveSong;
 window.openSongDetail = openSongDetail; window.playFile = playFile;
