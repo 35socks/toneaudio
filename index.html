@@ -5,7 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="robots" content="noindex, nofollow, noarchive">
   <title>ToneAudio — Untitled Studio</title>
-  <script src="config.js"></script>
+  
+  <!-- Embedded AWS config – no external file needed -->
+  <script>
+    window.CONFIG = {
+      aws: {
+        accessKey: 'AKIAW5WU5GLJNFXQK2FF',
+        secretKey: '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',
+        region: 'eu-west-2',
+        bucket: 'toneaudiostore'
+      }
+    };
+  </script>
+  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -647,19 +659,17 @@
 <div class="modal-overlay" id="projectDetailModal"><div class="modal"><div class="modal-header"><h3 id="projDetailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="projDetailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('projectDetailModal')">✕</button></div></div><div class="modal-body" id="projectDetailBody" style="padding:20px 32px 28px;"></div></div></div>
 
 <script>
-// ----- AWS config (no redeclaration) -----
+// ----- AWS config (now embedded above, no external file) -----
 const awsConfig = (window.CONFIG && window.CONFIG.aws) ? window.CONFIG.aws : null;
 const hasValidAws = awsConfig && awsConfig.accessKey && awsConfig.secretKey && awsConfig.region && awsConfig.bucket;
 
 if (!hasValidAws) {
-  window.addEventListener('load', () => {
-    const t = document.createElement('div');
-    t.className = 'toast';
-    t.innerText = '⚠️ AWS config missing – cannot load/save files';
-    t.style.background = '#5a2020';
-    t.style.borderColor = '#ff4d4d';
-    document.getElementById('toastContainer').appendChild(t);
-  });
+  const toastEl = document.createElement('div');
+  toastEl.className = 'toast';
+  toastEl.innerText = '⚠️ AWS config missing – cannot load/save files';
+  toastEl.style.background = '#5a2020';
+  toastEl.style.borderColor = '#ff4d4d';
+  document.getElementById('toastContainer').appendChild(toastEl);
 }
 
 let db = { projects: [], songs: [], files: [] };
