@@ -468,6 +468,10 @@
       margin-bottom: 14px;
     }
 
+    textarea {
+      resize: vertical;
+    }
+
     .upload-zone {
       border: 1px dashed rgba(255,255,255,0.15);
       border-radius: var(--radius-lg);
@@ -493,6 +497,103 @@
     .file-row:hover {
       border-color: var(--border-glow);
       background: #12161f;
+    }
+
+    /* Custom audio player */
+    .player-bar {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: auto;
+      min-width: 400px;
+      max-width: 90vw;
+      background: rgba(10, 13, 18, 0.85);
+      backdrop-filter: blur(30px);
+      border-radius: 100px;
+      padding: 10px 28px;
+      display: none;
+      align-items: center;
+      gap: 20px;
+      z-index: 90;
+      border: 1px solid rgba(255,255,255,0.08);
+      box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+    }
+
+    .player-bar.visible { display: flex; }
+
+    .player-art {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: #1a1e26;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.2rem;
+    }
+
+    .player-controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .player-info {
+      min-width: 0;
+    }
+
+    .player-title {
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .player-sub {
+      font-size: 0.75rem;
+      opacity: 0.5;
+    }
+
+    .player-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.2rem;
+      cursor: pointer;
+      padding: 6px;
+      transition: opacity 0.2s;
+    }
+
+    .player-btn:hover {
+      opacity: 0.7;
+    }
+
+    .player-progress {
+      flex: 1;
+      height: 4px;
+      background: rgba(255,255,255,0.1);
+      border-radius: 2px;
+      position: relative;
+      cursor: pointer;
+      min-width: 100px;
+    }
+
+    .player-progress-fill {
+      height: 100%;
+      background: white;
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+
+    .player-time {
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      opacity: 0.6;
+      white-space: nowrap;
     }
 
     #pin-screen {
@@ -559,39 +660,6 @@
       transform: scale(0.96);
     }
 
-    .player-bar {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: auto;
-      min-width: 400px;
-      max-width: 90vw;
-      background: rgba(10, 13, 18, 0.85);
-      backdrop-filter: blur(30px);
-      border-radius: 100px;
-      padding: 10px 28px;
-      display: none;
-      align-items: center;
-      gap: 20px;
-      z-index: 90;
-      border: 1px solid rgba(255,255,255,0.08);
-      box-shadow: 0 15px 40px rgba(0,0,0,0.6);
-    }
-
-    .player-bar.visible { display: flex; }
-
-    .player-art {
-      width: 42px;
-      height: 42px;
-      border-radius: 12px;
-      background: #1a1e26;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-    }
-
     @media (max-width: 780px) {
       .sidebar { position: fixed; left: -280px; top: 0; height: 100vh; }
       .sidebar.mobile-open { left: 0; }
@@ -643,14 +711,22 @@
   </main>
 </div>
 
+<!-- Custom audio player -->
 <div class="player-bar" id="playerBar">
   <div class="player-art">🎵</div>
-  <div class="player-info" style="flex:1; min-width:0;">
-    <div id="playerTitle" style="font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;"></div>
-    <div id="playerSub" style="font-size:0.75rem; opacity:0.5;"></div>
+  <div class="player-controls">
+    <div class="player-info">
+      <div class="player-title" id="playerTitle"></div>
+      <div class="player-sub" id="playerSub"></div>
+    </div>
+    <button class="player-btn" id="playPauseBtn">▶</button>
+    <div class="player-progress" id="progressBar">
+      <div class="player-progress-fill" id="progressFill"></div>
+    </div>
+    <span class="player-time" id="timeDisplay">0:00 / 0:00</span>
   </div>
-  <audio id="audioPlayer" controls style="max-width:240px; height:36px;"></audio>
-  <button onclick="closePlayer()" style="background:none; border:none; color:white; font-size:1.2rem; padding:6px;">✕</button>
+  <button class="player-btn" id="closePlayerBtn">✕</button>
+  <audio id="audioPlayer" style="display:none;"></audio>
 </div>
 
 <div class="toast-container" id="toastContainer"></div>
@@ -662,7 +738,7 @@
 <div class="modal-overlay" id="projectDetailModal"><div class="modal"><div class="modal-header"><h3 id="projDetailTitle"></h3><div><button class="btn btn-ghost btn-sm" id="projDetailEditBtn">Edit</button><button class="modal-close" onclick="closeModal('projectDetailModal')">✕</button></div></div><div class="modal-body" id="projectDetailBody" style="padding:20px 32px 28px;"></div></div></div>
 
 <script>
-// ----- AWS SDK initialization -----
+// ----- AWS SDK initialization (unchanged) -----
 const awsConfig = window.CONFIG?.aws || {};
 AWS.config.update({
   accessKeyId: awsConfig.accessKey,
@@ -675,7 +751,7 @@ const DB_KEY = 'data/db.json';
 // ----- App state -----
 let db = { projects: [], songs: [], files: [] };
 let editingProjectId = null, editingSongId = null, currentSongId = null, currentProjectId = null;
-let saveTimer = null;
+let currentAudio = null; // track currently playing file id
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
 function toast(msg, type='info') {
@@ -686,7 +762,7 @@ function toast(msg, type='info') {
   setTimeout(() => t.remove(), 2500);
 }
 
-// ----- S3 operations using SDK -----
+// ----- S3 operations (unchanged) -----
 async function loadFromS3() {
   try {
     const data = await s3.getObject({ Key: DB_KEY }).promise();
@@ -699,18 +775,23 @@ async function loadFromS3() {
   updateUI();
 }
 
-async function saveToS3() {
+// Immediate save (used after critical operations)
+async function saveNow() {
+  const body = JSON.stringify({ projects: db.projects, songs: db.songs, files: db.files });
+  try {
+    await s3.putObject({ Key: DB_KEY, Body: body, ContentType: 'application/json' }).promise();
+    console.log('DB saved');
+  } catch (e) {
+    console.warn('Save failed', e);
+    toast('Save failed');
+  }
+}
+
+// Debounced auto-save (used for less critical updates)
+let saveTimer = null;
+function saveToS3() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(async () => {
-    const body = JSON.stringify({ projects: db.projects, songs: db.songs, files: db.files });
-    try {
-      await s3.putObject({ Key: DB_KEY, Body: body, ContentType: 'application/json' }).promise();
-      toast('auto-saved');
-    } catch (e) {
-      console.warn('Save failed', e);
-      toast('Save failed');
-    }
-  }, 500);
+  saveTimer = setTimeout(saveNow, 500);
 }
 
 async function uploadFileToS3(file, songId, projectId, progressId) {
@@ -736,12 +817,21 @@ async function uploadFileToS3(file, songId, projectId, progressId) {
     size: file.size,
     uploaded: Date.now()
   });
-  saveToS3();
+  // Immediate save after upload to prevent data loss on refresh
+  await saveNow();
   toast(`⬆️ ${file.name}`);
 }
 
 async function getSignedUrl(key) {
   return s3.getSignedUrl('getObject', { Key: key, Expires: 3600 });
+}
+
+async function deleteS3Object(key) {
+  try {
+    await s3.deleteObject({ Key: key }).promise();
+  } catch (e) {
+    console.warn('S3 delete failed', e);
+  }
 }
 
 // ----- UI helpers -----
@@ -854,35 +944,91 @@ async function uploadFiles(files, songId, projectId, progressId) {
   if (songId && document.getElementById('songDetailModal').classList.contains('open')) openSongDetail(songId);
   if (progressId) setTimeout(() => document.getElementById(progressId).style.width = '0%', 1000);
 }
+
+// ----- Custom player controls -----
+const audio = document.getElementById('audioPlayer');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const progressBar = document.getElementById('progressBar');
+const progressFill = document.getElementById('progressFill');
+const timeDisplay = document.getElementById('timeDisplay');
+const playerBar = document.getElementById('playerBar');
+
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return mins + ':' + (secs < 10 ? '0' : '') + secs;
+}
+
+playPauseBtn.addEventListener('click', () => {
+  if (audio.paused) {
+    audio.play();
+    playPauseBtn.textContent = '⏸';
+  } else {
+    audio.pause();
+    playPauseBtn.textContent = '▶';
+  }
+});
+
+audio.addEventListener('loadedmetadata', () => {
+  timeDisplay.textContent = formatTime(audio.currentTime) + ' / ' + formatTime(audio.duration);
+});
+
+audio.addEventListener('timeupdate', () => {
+  if (audio.duration) {
+    const pct = (audio.currentTime / audio.duration) * 100;
+    progressFill.style.width = pct + '%';
+    timeDisplay.textContent = formatTime(audio.currentTime) + ' / ' + formatTime(audio.duration);
+  }
+});
+
+progressBar.addEventListener('click', (e) => {
+  const rect = progressBar.getBoundingClientRect();
+  const pct = (e.clientX - rect.left) / rect.width;
+  audio.currentTime = pct * audio.duration;
+});
+
+document.getElementById('closePlayerBtn').addEventListener('click', closePlayer);
+
 async function playFile(id) {
   const f = db.files.find(x => x.id === id);
   if (!f) return;
   const url = await getSignedUrl(f.s3key);
-  const audio = document.getElementById('audioPlayer');
   audio.src = url;
   audio.play();
+  playPauseBtn.textContent = '⏸';
   document.getElementById('playerTitle').innerText = f.filename;
   document.getElementById('playerSub').innerText = db.songs.find(s => s.id === f.songId)?.title || '';
-  document.getElementById('playerBar').classList.add('visible');
+  playerBar.classList.add('visible');
+  currentAudio = id;
 }
+
 function closePlayer() {
-  const a = document.getElementById('audioPlayer');
-  a.pause();
-  a.src = '';
-  document.getElementById('playerBar').classList.remove('visible');
+  audio.pause();
+  audio.src = '';
+  playerBar.classList.remove('visible');
+  currentAudio = null;
 }
+
 async function downloadFile(id) {
   const f = db.files.find(x => x.id === id);
   if (!f) return;
   const url = await getSignedUrl(f.s3key);
   window.open(url);
 }
-function deleteFileRecord(id) {
-  db.files = db.files.filter(f => f.id !== id);
-  saveToS3();
-  renderFiles();
-  toast('removed from catalog');
+
+async function deleteFileRecord(id) {
+  if (!confirm('Delete this file? It will be removed from S3 as well.')) return;
+  const f = db.files.find(x => x.id === id);
+  if (f) {
+    await deleteS3Object(f.s3key);
+    db.files = db.files.filter(x => x.id !== id);
+    await saveNow();
+    renderFiles();
+    toast('File deleted');
+    if (currentAudio === id) closePlayer();
+  }
 }
+
 function openProjectModal(id) {
   editingProjectId = id;
   const p = id ? db.projects.find(x => x.id === id) : null;
@@ -892,6 +1038,7 @@ function openProjectModal(id) {
   document.getElementById('projNotes').value = p?.notes || '';
   openModal('projectModal');
 }
+
 function saveProject() {
   const name = document.getElementById('projName').value.trim();
   if (!name) return;
@@ -903,6 +1050,7 @@ function saveProject() {
   }
   saveToS3(); closeModal('projectModal'); updateUI();
 }
+
 function openSongModal(id) {
   editingSongId = id;
   const s = id ? db.songs.find(x => x.id === id) : null;
@@ -915,6 +1063,7 @@ function openSongModal(id) {
   document.getElementById('songNotes').value = s?.notes || '';
   openModal('songModal');
 }
+
 function saveSong() {
   const title = document.getElementById('songTitle').value.trim();
   if (!title) return;
@@ -935,6 +1084,7 @@ function saveSong() {
   }
   saveToS3(); closeModal('songModal'); updateUI();
 }
+
 function openSongDetail(id) {
   currentSongId = id;
   const s = db.songs.find(x => x.id === id);
@@ -949,7 +1099,7 @@ function openSongDetail(id) {
       <div><label style="opacity:0.6; font-size:0.8rem;">BPM</label><div>${s.bpm || '—'}</div></div>
       <div><label style="opacity:0.6; font-size:0.8rem;">Key</label><div>${esc(s.key || '—')}</div></div>
     </div>
-    ${s.lyrics ? `<div style="margin-top:20px;"><label style="opacity:0.6; font-size:0.8rem;">Lyrics</label><div style="background:#0b0d12; padding:16px; border-radius:16px; margin-top:6px;">${esc(s.lyrics)}</div></div>` : ''}
+    ${s.lyrics ? `<div style="margin-top:20px;"><label style="opacity:0.6; font-size:0.8rem;">Lyrics</label><div style="background:#0b0d12; padding:16px; border-radius:16px; margin-top:6px; white-space:pre-wrap;">${esc(s.lyrics)}</div></div>` : ''}
     <div style="margin-top:24px;"><div class="section-label">Audio files</div>${files.map(f => `<div class="file-row"><span>🎵</span><span style="flex:1;">${esc(f.filename)}</span><div><button class="btn btn-ghost btn-sm" onclick="playFile('${f.id}')">▶</button><button class="btn btn-ghost btn-sm" onclick="downloadFile('${f.id}')">↓</button></div></div>`).join('') || '<div style="opacity:0.5; padding:12px;">none</div>'}</div>
     <div class="upload-zone" style="margin-top:20px;">
       <input type="file" multiple accept="audio/*" id="songUploadInput" onchange="handleSongUpload(this, '${id}')">
@@ -960,18 +1110,24 @@ function openSongDetail(id) {
   document.getElementById('detailEditBtn').onclick = () => { closeModal('songDetailModal'); openSongModal(id); };
   openModal('songDetailModal');
 }
+
 function handleSongUpload(input, songId) {
   const files = Array.from(input.files);
   const song = db.songs.find(s => s.id === songId);
   uploadFiles(files, songId, song?.projectId || null, 'songDetailProgress');
 }
+
 function deleteSong(id) {
-  if (confirm('delete song and references?')) {
+  if (confirm('delete song and all its file references?')) {
+    // Also delete associated S3 files
+    const files = db.files.filter(f => f.songId === id);
+    files.forEach(async f => await deleteS3Object(f.s3key));
     db.songs = db.songs.filter(s => s.id !== id);
     db.files = db.files.filter(f => f.songId !== id);
-    saveToS3(); closeModal('songDetailModal'); updateUI(); toast('song removed');
+    saveNow(); closeModal('songDetailModal'); updateUI(); toast('song removed');
   }
 }
+
 function openProjectDetail(id) {
   currentProjectId = id;
   const p = db.projects.find(x => x.id === id);
@@ -985,13 +1141,15 @@ function openProjectDetail(id) {
   document.getElementById('projDetailEditBtn').onclick = () => { closeModal('projectDetailModal'); openProjectModal(id); };
   openModal('projectDetailModal');
 }
+
 function deleteProject(id) {
-  if (confirm('delete project? songs unassigned')) {
+  if (confirm('delete project? songs will be unassigned')) {
     db.projects = db.projects.filter(p => p.id !== id);
     db.songs.forEach(s => { if (s.projectId === id) s.projectId = null; });
     saveToS3(); closeModal('projectDetailModal'); updateUI();
   }
 }
+
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function openModal(id) { document.getElementById(id).classList.add('open'); }
 
@@ -1054,7 +1212,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'Enter') { e.preventDefault(); if (pinEntry.length === 6) submitPin(); }
 });
 
-// ----- Global event listeners -----
+// ----- Global event listeners (mostly unchanged) -----
 document.querySelectorAll('.modal-overlay').forEach(o => o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); }));
 document.getElementById('globalFileInput').onchange = e => uploadFiles(Array.from(e.target.files), null, null, 'globalProgress');
 document.getElementById('globalUploadZone').addEventListener('dragover', e => e.preventDefault());
@@ -1072,7 +1230,7 @@ document.getElementById('filesSongFilter').addEventListener('change', () => rend
 document.querySelectorAll('.nav-item').forEach(n => n.addEventListener('click', () => navigate(n.getAttribute('data-page'))));
 document.getElementById('hamburgerBtn').addEventListener('click', () => document.querySelector('.sidebar').classList.toggle('mobile-open'));
 
-// Expose globals for onclick handlers
+// Expose globals
 window.openProjectModal = openProjectModal; window.openSongModal = openSongModal;
 window.saveProject = saveProject; window.saveSong = saveSong;
 window.openSongDetail = openSongDetail; window.playFile = playFile;
